@@ -4,6 +4,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from datetime import datetime, timedelta
 import qrcode, io, base64, secrets
+import os
 
 from .db import conn, cursor
 
@@ -129,9 +130,8 @@ def start_session(session_id: str, request: Request):
     expiry = datetime.utcnow() + timedelta(seconds=30)  # Increased to 30 seconds
     token = f"{session_id}:{nonce}:{int(expiry.timestamp())}"
     
-    # Force a fixed host so phones can always reach the server
-    # Change this if your Wi‑Fi IP changes
-    base_url = "http://192.168.1.6:8000"
+    # Determine base URL: prefer public BASE_URL env (for tunnels/deployments), else current request host
+    base_url = os.getenv("BASE_URL") or str(request.base_url).rstrip("/")
     # Create a URL that will prompt for student ID
     mark_url = f"{base_url}/mark_attendance_form/{token}"
     
@@ -233,7 +233,17 @@ async def mark_attendance(token: str, student_id: str):
     except Exception as e:
         error_msg = f"Invalid token format: {str(e)}"
         print(error_msg)
-        return {"status": "error", "message": error_msg}
+        return HTMLResponse(content=f"""
+        <!DOCTYPE html>
+        <html>
+        <head><title>Error</title></head>
+        <body style=\"font-family:Arial; text-align:center; padding:50px; background:#fff3f3;\">
+            <h2>Invalid QR Link</h2>
+            <p>{error_msg}</p>
+            <a href=\"/\" style=\"display:inline-block; margin-top:20px; padding:10px 20px; background:#4CAF50; color:#fff; text-decoration:none; border-radius:5px;\">Back to Home</a>
+        </body>
+        </html>
+        """, status_code=400)
 
     # Validate expiry
     current_time = datetime.utcnow().timestamp()
@@ -243,10 +253,17 @@ async def mark_attendance(token: str, student_id: str):
     
     if current_time > expiry_time:
         print("Token expired")
-        return {
-            "status": "error",
-            "message": "QR code has expired. Please try again with a fresh code."
-        }
+        return HTMLResponse(content=f"""
+        <!DOCTYPE html>
+        <html>
+        <head><title>QR Expired</title></head>
+        <body style=\"font-family:Arial; text-align:center; padding:50px; background:#fff8e1;\">
+            <h2>QR Code Expired</h2>
+            <p>Please go back and scan a fresh QR code from the teacher's screen.</p>
+            <a href=\"/\" style=\"display:inline-block; margin-top:20px; padding:10px 20px; background:#4CAF50; color:#fff; text-decoration:none; border-radius:5px;\">Back to Home</a>
+        </body>
+        </html>
+        """, status_code=410)
     
     # Mark attendance
     try:
@@ -370,7 +387,17 @@ async def mark_attendance(token: str, student_id: str):
     except Exception as e:
         error_msg = f"Error marking attendance: {str(e)}"
         print(error_msg)
-        return {"status": "error", "message": error_msg}
+        return HTMLResponse(content=f"""
+        <!DOCTYPE html>
+        <html>
+        <head><title>Server Error</title></head>
+        <body style=\"font-family:Arial; text-align:center; padding:50px; background:#fff3f3;\">
+            <h2>Internal Server Error</h2>
+            <p>{error_msg}</p>
+            <a href=\"/\" style=\"display:inline-block; margin-top:20px; padding:10px 20px; background:#4CAF50; color:#fff; text-decoration:none; border-radius:5px;\">Back to Home</a>
+        </body>
+        </html>
+        """, status_code=500)
 
 # View attendance (for teacher)
 @app.get("/view/{session_id}", response_class=HTMLResponse)
