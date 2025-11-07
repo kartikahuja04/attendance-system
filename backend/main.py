@@ -1,5 +1,5 @@
 from fastapi import FastAPI, Request, Form
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from datetime import datetime, timedelta
@@ -156,8 +156,40 @@ def start_session(session_id: str, request: Request):
         <p style="margin-top:10px; font-size:12px; color:#555;">If scanning fails, open this URL directly:<br>
            <a href="{mark_url}">{mark_url}</a>
         </p>
+        <div style="max-width:800px; margin:20px auto; text-align:left;">
+            <h3 style="margin-bottom:8px;">Live Attendance</h3>
+            <div id="att-count" style="margin-bottom:8px; color:#333;">Loading...</div>
+            <table id="att-table" style="width:100%; border-collapse:collapse;">
+                <thead>
+                    <tr>
+                        <th style="text-align:left; border-bottom:1px solid #ddd; padding:8px;">Student ID</th>
+                        <th style="text-align:left; border-bottom:1px solid #ddd; padding:8px;">Time</th>
+                    </tr>
+                </thead>
+                <tbody id="att-body"></tbody>
+            </table>
+        </div>
         <script>
             setTimeout(() => window.location.reload(), 10000);
+            async function loadAttendance() {{
+                try {{
+                    const res = await fetch('/api/attendance/{session_id}');
+                    const data = await res.json();
+                    document.getElementById('att-count').textContent = 'Total Records: ' + data.total;
+                    const tbody = document.getElementById('att-body');
+                    tbody.innerHTML = '';
+                    for (const row of data.records) {{
+                        const tr = document.createElement('tr');
+                        tr.innerHTML = '<td style="padding:8px; border-bottom:1px solid #eee;">' + row.student_id + '</td>' +
+                                       '<td style="padding:8px; border-bottom:1px solid #eee;">' + row.timestamp + '</td>';
+                        tbody.appendChild(tr);
+                    }}
+                }} catch (e) {{
+                    document.getElementById('att-count').textContent = 'Failed to load attendance';
+                }}
+            }}
+            loadAttendance();
+            setInterval(loadAttendance, 3000);
         </script>
     </body>
     </html>
@@ -383,7 +415,6 @@ async def mark_attendance(token: str, student_id: str):
         """
         
         return HTMLResponse(content=html_content, status_code=200)
-        
     except Exception as e:
         error_msg = f"Error marking attendance: {str(e)}"
         print(error_msg)
@@ -398,6 +429,26 @@ async def mark_attendance(token: str, student_id: str):
         </body>
         </html>
         """, status_code=500)
+
+# Live attendance JSON API
+@app.get("/api/attendance/{session_id}")
+def api_attendance(session_id: str):
+    cursor.execute(
+        """
+        SELECT student_id,
+               strftime('%Y-%m-%d %H:%M:%S', timestamp) as formatted_time
+        FROM attendance
+        WHERE session_id=?
+        ORDER BY timestamp DESC
+        """,
+        (session_id,),
+    )
+    rows = cursor.fetchall()
+    records = [
+        {"student_id": sid, "timestamp": ts}
+        for (sid, ts) in rows
+    ]
+    return JSONResponse({"session": session_id, "total": len(records), "records": records})
 
 # View attendance (for teacher)
 @app.get("/view/{session_id}", response_class=HTMLResponse)
