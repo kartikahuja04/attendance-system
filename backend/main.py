@@ -1,3 +1,4 @@
+from sqlite3.dbapi2 import Timestamp
 from fastapi import FastAPI, Request, Form
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -153,6 +154,7 @@ def start_session(session_id: str, request: Request):
         <h2>Session: {session_id}</h2>
         <p>Scan QR to mark attendance</p>
         <img src="data:image/png;base64,{img_b64}" width="220" style="border:2px solid black;">
+        <div id="qr-countdown" style="margin-top:8px; font-weight:600; color:#e63946;"></div>
         <p style="margin-top:10px; font-size:12px; color:#555;">If scanning fails, open this URL directly:<br>
            <a href="{mark_url}">{mark_url}</a>
         </p>
@@ -170,7 +172,19 @@ def start_session(session_id: str, request: Request):
             </table>
         </div>
         <script>
-            setTimeout(() => window.location.reload(), 10000);
+            // QR refresh countdown (10 seconds)
+            let qrTimeLeft = 10;
+            const qrCountdownEl = document.getElementById('qr-countdown');
+            function updateQrCountdown() {{
+                if (qrCountdownEl) {{
+                    qrCountdownEl.textContent = 'QR refreshes in ' + qrTimeLeft + 's';
+                }}
+                qrTimeLeft--;
+                if (qrTimeLeft < 0) qrTimeLeft = 0;
+            }}
+            updateQrCountdown();
+            const qrCountdownTimer = setInterval(updateQrCountdown, 1000);
+            setTimeout(() => {{ clearInterval(qrCountdownTimer); window.location.reload(); }}, 10000);
             async function loadAttendance() {{
                 try {{
                     const res = await fetch('/api/attendance/{session_id}');
