@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Teacher Login - Attendance System</title>
+    <link rel="stylesheet" href="/static/style.css">
     <style>
         * {
             margin: 0;
@@ -13,7 +14,7 @@
         
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, var(--primary-dark) 0%, var(--primary) 100%);
             min-height: 100vh;
             display: flex;
             justify-content: center;
@@ -80,13 +81,13 @@
         
         .form-group input:focus {
             outline: none;
-            border-color: #667eea;
+            border-color: var(--primary);
         }
         
         .login-btn {
             width: 100%;
             padding: 14px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, var(--primary-dark) 0%, var(--primary) 100%);
             color: white;
             border: none;
             border-radius: 8px;
@@ -115,8 +116,8 @@
         }
         
         .info-box {
-            background: #f0f7ff;
-            border-left: 4px solid #667eea;
+            background: var(--primary-light);
+            border-left: 4px solid var(--primary);
             padding: 12px;
             border-radius: 4px;
             margin-top: 20px;

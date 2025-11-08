@@ -44,6 +44,16 @@ CREATE TABLE IF NOT EXISTS attendance (
 )
 """)
 
+# Migration: ensure 'marked_by' column exists on 'attendance'
+# Older databases may be missing this column, causing 'no such column: marked_by'.
+try:
+    cursor.execute("PRAGMA table_info(attendance)")
+    cols = [row[1] for row in cursor.fetchall()]
+    if 'marked_by' not in cols:
+        cursor.execute("ALTER TABLE attendance ADD COLUMN marked_by TEXT DEFAULT 'qr'")
+except Exception:
+    pass
+
 # Create default teacher account (username: admin, password: admin123)
 # Password hash for 'admin123'
 default_password_hash = hashlib.sha256("admin123".encode()).hexdigest()

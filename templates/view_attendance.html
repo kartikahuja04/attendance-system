@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>View Attendance - Attendance System</title>
+    <link rel="stylesheet" href="/static/style.css">
     <style>
         * {
             margin: 0;
@@ -13,12 +14,12 @@
         
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: #f5f7fa;
+            background: var(--bg);
             min-height: 100vh;
         }
         
         .navbar {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, var(--primary-dark) 0%, var(--primary) 100%);
             color: white;
             padding: 20px 40px;
             display: flex;
@@ -69,7 +70,7 @@
             background: #f8f9fa;
             padding: 20px;
             border-radius: 8px;
-            border-left: 4px solid #667eea;
+            border-left: 4px solid var(--primary);
             cursor: pointer;
             transition: transform 0.2s, box-shadow 0.2s;
         }
@@ -102,10 +103,7 @@
             margin-top: 10px;
         }
         
-        .status.active {
-            background: #d4edda;
-            color: #155724;
-        }
+        .status.active { background: var(--ok-bg); color: var(--ok-text); }
         
         .status.ended {
             background: #f8d7da;
@@ -160,7 +158,7 @@
         }
         
         .stat-card {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, var(--primary-dark) 0%, var(--primary) 100%);
             color: white;
             padding: 20px;
             border-radius: 8px;
@@ -213,10 +211,7 @@
             transition: transform 0.2s, box-shadow 0.2s;
         }
         
-        .btn-primary {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-        }
+        .btn-primary { background: linear-gradient(135deg, var(--primary-dark) 0%, var(--primary) 100%); color: white; }
         
         .btn-primary:hover {
             transform: translateY(-2px);

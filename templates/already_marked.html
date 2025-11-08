@@ -3,7 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Already Marked</title>
+    <title>Already Marked - Attendance System</title>
+    <link rel="stylesheet" href="/static/style.css">
     <style>
         * {
             margin: 0;
@@ -12,43 +13,45 @@
         }
         
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #ff9800 0%, #f57c00 100%);
-            min-height: 100vh;
+            background: linear-gradient(135deg, var(--primary-dark) 0%, var(--primary) 100%);
             display: flex;
             justify-content: center;
             align-items: center;
             padding: 20px;
+            min-height: 100vh;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         }
         
         .message-box {
-            background: white;
+            background: var(--card);
             border-radius: 20px;
             box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
             padding: 40px;
             text-align: center;
             max-width: 400px;
+            width: 100%;
         }
         
         .message-icon {
             font-size: 64px;
-            color: #ff9800;
+            color: var(--primary);
             margin-bottom: 20px;
         }
         
         .message-box h2 {
-            color: #333;
+            color: var(--text);
             margin-bottom: 20px;
             font-size: 24px;
         }
         
         .message-box p {
-            color: #666;
+            color: var(--muted);
             margin-bottom: 10px;
         }
         
         .message-box .info {
-            background: #fff3e0;
+            background: var(--warn-bg);
+            color: var(--warn-text);
             padding: 15px;
             border-radius: 8px;
             margin: 20px 0;
@@ -56,7 +59,7 @@
         }
         
         .message-box .info strong {
-            color: #333;
+            color: var(--text);
         }
     </style>
 </head>

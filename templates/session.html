@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Session - {{ session_id }}</title>
+    <link rel="stylesheet" href="/static/style.css">
     <style>
         * {
             margin: 0;
@@ -13,12 +14,12 @@
         
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: #f5f7fa;
+            background: var(--bg);
             min-height: 100vh;
         }
         
         .navbar {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, var(--primary-dark) 0%, var(--primary) 100%);
             color: white;
             padding: 20px 40px;
             display: flex;
@@ -116,7 +117,7 @@
             margin: 20px auto;
             padding: 20px;
             background: white;
-            border: 3px solid #667eea;
+            border: 3px solid var(--primary);
             border-radius: 12px;
             display: inline-block;
         }
@@ -167,7 +168,7 @@
         }
         
         .stat-card {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, var(--primary-dark) 0%, var(--primary) 100%);
             color: white;
             padding: 20px;
             border-radius: 8px;
@@ -205,7 +206,7 @@
         
         .manual-form button {
             padding: 10px 20px;
-            background: #4CAF50;
+            background: var(--success);
             color: white;
             border: none;
             border-radius: 8px;
@@ -218,7 +219,7 @@
         }
         
         .end-session-btn {
-            background: #dc3545;
+            background: var(--danger);
             color: white;
             border: none;
             padding: 12px 30px;
@@ -231,7 +232,7 @@
         }
         
         .end-session-btn:hover {
-            background: #c82333;
+            background: var(--danger-dark);
         }
         
         @media (max-width: 768px) {

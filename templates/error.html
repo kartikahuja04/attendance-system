@@ -3,7 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Error</title>
+    <title>Error - Attendance System</title>
+    <link rel="stylesheet" href="/static/style.css">
     <style>
         * {
             margin: 0;
@@ -12,9 +13,7 @@
         }
         
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
-            min-height: 100vh;
+            background: linear-gradient(135deg, var(--danger-dark) 0%, var(--danger) 100%);
             display: flex;
             justify-content: center;
             align-items: center;
@@ -22,7 +21,7 @@
         }
         
         .error-box {
-            background: white;
+            background: var(--card);
             border-radius: 20px;
             box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
             padding: 40px;
@@ -32,25 +31,25 @@
         
         .error-icon {
             font-size: 64px;
-            color: #dc3545;
+            color: var(--danger);
             margin-bottom: 20px;
         }
         
         .error-box h2 {
-            color: #333;
+            color: var(--text);
             margin-bottom: 20px;
             font-size: 24px;
         }
         
         .error-box p {
-            color: #666;
+            color: var(--muted);
             margin-bottom: 20px;
         }
         
         .home-btn {
             display: inline-block;
             padding: 12px 30px;
-            background: #667eea;
+            background: var(--primary);
             color: white;
             text-decoration: none;
             border-radius: 8px;
@@ -60,7 +59,8 @@
         
         .home-btn:hover {
             transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+            box-shadow: 0 5px 15px var(--primary-dark);
+            background: var(--primary-dark);
         }
     </style>
 </head>

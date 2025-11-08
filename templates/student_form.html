@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Mark Attendance - Student</title>
+    <link rel="stylesheet" href="/static/style.css">
     <style>
         * {
             margin: 0;
@@ -12,9 +13,7 @@
         }
         
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
+            background: linear-gradient(135deg, var(--primary-dark) 0%, var(--primary) 100%);
             display: flex;
             justify-content: center;
             align-items: center;
@@ -22,7 +21,7 @@
         }
         
         .form-container {
-            background: white;
+            background: var(--card);
             border-radius: 20px;
             box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
             padding: 40px;
@@ -32,7 +31,7 @@
         }
         
         .form-container h2 {
-            color: #333;
+            color: var(--text);
             margin-bottom: 30px;
             font-size: 24px;
         }
@@ -44,8 +43,8 @@
         .form-group label {
             display: block;
             margin-bottom: 8px;
-            color: #333;
-            font-weight: 500;
+            color: var(--text);
+            font-weight: 600;
             text-align: left;
         }
         
@@ -60,13 +59,13 @@
         
         .form-group input:focus {
             outline: none;
-            border-color: #667eea;
+            border-color: var(--primary);
         }
         
         .submit-btn {
             width: 100%;
             padding: 14px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, var(--primary-dark) 0%, var(--primary) 100%);
             color: white;
             border: none;
             border-radius: 8px;
@@ -78,7 +77,7 @@
         
         .submit-btn:hover {
             transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+            box-shadow: 0 5px 15px var(--primary-dark);
         }
     </style>
 </head>

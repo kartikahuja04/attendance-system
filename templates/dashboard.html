@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dashboard - Attendance System</title>
+    <link rel="stylesheet" href="/static/style.css">
     <style>
         * {
             margin: 0;
@@ -13,12 +14,12 @@
         
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: #f5f7fa;
+            background: var(--bg);
             min-height: 100vh;
         }
         
         .navbar {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, var(--primary-dark) 0%, var(--primary) 100%);
             color: white;
             padding: 20px 40px;
             display: flex;
@@ -116,11 +117,11 @@
         }
         
         .option-card.mark {
-            border-top: 4px solid #4CAF50;
+            border-top: 4px solid var(--success);
         }
         
         .option-card.view {
-            border-top: 4px solid #2196F3;
+            border-top: 4px solid var(--info);
         }
         
         @media (max-width: 768px) {
