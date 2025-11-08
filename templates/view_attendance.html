@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>View Attendance - Attendance System</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f5f7fa;
+            min-height: 100vh;
+        }
+        
+        .navbar {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px 40px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+        
+        .navbar a {
+            color: white;
+            text-decoration: none;
+            padding: 8px 16px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 6px;
+            transition: background 0.3s;
+        }
+        
+        .navbar a:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 40px auto;
+            padding: 0 20px;
+        }
+        
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            margin-bottom: 30px;
+        }
+        
+        .card h2 {
+            color: #333;
+            margin-bottom: 20px;
+            font-size: 24px;
+        }
+        
+        .sessions-list {
+            display: grid;
+            gap: 15px;
+        }
+        
+        .session-card {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        
+        .session-card:hover {
+            transform: translateX(5px);
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+        
+        .session-card h3 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+        
+        .session-card .details {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 10px;
+            margin-top: 10px;
+            font-size: 14px;
+            color: #666;
+        }
+        
+        .session-card .status {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+            margin-top: 10px;
+        }
+        
+        .status.active {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        .status.ended {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        
+        .attendance-details {
+            display: none;
+        }
+        
+        .attendance-details.show {
+            display: block;
+        }
+        
+        .session-info {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        
+        .session-info-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+        
+        .info-item {
+            padding: 10px;
+            background: white;
+            border-radius: 6px;
+        }
+        
+        .info-item label {
+            display: block;
+            color: #666;
+            font-size: 12px;
+            margin-bottom: 5px;
+        }
+        
+        .info-item span {
+            color: #333;
+            font-weight: 600;
+        }
+        
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .stat-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+        }
+        
+        .stat-card .number {
+            font-size: 32px;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        
+        .stat-card .label {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+        
+        .attendance-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        
+        .attendance-table th,
+        .attendance-table td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        
+        .attendance-table th {
+            background: #f8f9fa;
+            font-weight: 600;
+            color: #333;
+        }
+        
+        .attendance-table tbody tr:hover {
+            background: #f8f9fa;
+        }
+        
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-block;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+        
+        .btn-success {
+            background: #4CAF50;
+            color: white;
+        }
+        
+        .btn-success:hover {
+            background: #45a049;
+        }
+        
+        .actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <h1>📋 View Attendance</h1>
+        <a href="/dashboard">← Back to Dashboard</a>
+    </nav>
+    
+    <div class="container">
+        <div class="card">
+            <h2>Select Session</h2>
+            <div id="sessionsList" class="sessions-list">
+                <div class="loading">Loading sessions...</div>
+            </div>
+        </div>
+        
+        <div class="card attendance-details" id="attendanceDetails">
+            <h2>Attendance Details</h2>
+            <div id="attendanceContent">
+                <div class="loading">Select a session to view attendance</div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        let currentSessionId = null;
+        
+        // Load all sessions
+        async function loadSessions() {
+            try {
+                const response = await fetch('/api/sessions');
+                const data = await response.json();
+                const container = document.getElementById('sessionsList');
+                
+                if (data.sessions.length === 0) {
+                    container.innerHTML = '<p style="text-align: center; color: #666;">No sessions found</p>';
+                    return;
+                }
+                
+                container.innerHTML = data.sessions.map(session => `
+                    <div class="session-card" onclick="loadAttendance('${session.session_id}')">
+                        <h3>${session.class_name} - ${session.subject} (${session.section})</h3>
+                        <div class="details">
+                            <div><strong>Session ID:</strong> ${session.session_id}</div>
+                            <div><strong>Start:</strong> ${new Date(session.start_time).toLocaleString()}</div>
+                            <div><strong>End:</strong> ${session.end_time ? new Date(session.end_time).toLocaleString() : 'N/A'}</div>
+                        </div>
+                        <span class="status ${session.status}">${session.status.toUpperCase()}</span>
+                    </div>
+                `).join('');
+            } catch (error) {
+                console.error('Error loading sessions:', error);
+                document.getElementById('sessionsList').innerHTML = 
+                    '<p style="text-align: center; color: #dc3545;">Error loading sessions</p>';
+            }
+        }
+        
+        // Load attendance for a session
+        async function loadAttendance(sessionId) {
+            currentSessionId = sessionId;
+            const detailsDiv = document.getElementById('attendanceDetails');
+            const contentDiv = document.getElementById('attendanceContent');
+            
+            detailsDiv.classList.add('show');
+            contentDiv.innerHTML = '<div class="loading">Loading attendance...</div>';
+            
+            try {
+                const response = await fetch(`/api/attendance/view/${sessionId}`);
+                const data = await response.json();
+                
+                if (!response.ok) {
+                    throw new Error(data.detail || 'Error loading attendance');
+                }
+                
+                const session = data.session;
+                const attendance = data.attendance;
+                
+                contentDiv.innerHTML = `
+                    <div class="session-info">
+                        <h3>Session Information</h3>
+                        <div class="session-info-grid">
+                            <div class="info-item">
+                                <label>Class</label>
+                                <span>${session.class_name}</span>
+                            </div>
+                            <div class="info-item">
+                                <label>Subject</label>
+                                <span>${session.subject}</span>
+                            </div>
+                            <div class="info-item">
+                                <label>Section</label>
+                                <span>${session.section}</span>
+                            </div>
+                            <div class="info-item">
+                                <label>Start Time</label>
+                                <span>${new Date(session.start_time).toLocaleString()}</span>
+                            </div>
+                            <div class="info-item">
+                                <label>End Time</label>
+                                <span>${session.end_time ? new Date(session.end_time).toLocaleString() : 'N/A'}</span>
+                            </div>
+                            <div class="info-item">
+                                <label>Status</label>
+                                <span>${session.status.toUpperCase()}</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="stats">
+                        <div class="stat-card">
+                            <div class="number">${data.total_present}</div>
+                            <div class="label">Total Present</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="number">${data.total_absent || 0}</div>
+                            <div class="label">Total Absent</div>
+                        </div>
+                    </div>
+                    
+                    <div class="actions">
+                        <a href="/api/attendance/export/${sessionId}" class="btn btn-success">Export to Excel</a>
+                    </div>
+                    
+                    <table class="attendance-table">
+                        <thead>
+                            <tr>
+                                <th>Student ID</th>
+                                <th>Timestamp</th>
+                                <th>Method</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${attendance.length === 0 ? 
+                                '<tr><td colspan="3" style="text-align: center; color: #666;">No attendance records</td></tr>' :
+                                attendance.map(record => `
+                                    <tr>
+                                        <td>${record.student_id}</td>
+                                        <td>${record.timestamp}</td>
+                                        <td>
+                                            <span style="padding: 4px 8px; border-radius: 4px; font-size: 12px; 
+                                                background: ${record.marked_by === 'qr' ? '#d4edda' : '#fff3cd'}; 
+                                                color: ${record.marked_by === 'qr' ? '#155724' : '#856404'};">
+                                                ${record.marked_by === 'qr' ? 'QR Code' : 'Manual'}
+                                            </span>
+                                        </td>
+                                    </tr>
+                                `).join('')
+                            }
+                        </tbody>
+                    </table>
+                `;
+            } catch (error) {
+                contentDiv.innerHTML = `
+                    <div style="text-align: center; color: #dc3545; padding: 20px;">
+                        <p>Error loading attendance: ${error.message}</p>
+                    </div>
+                `;
+            }
+        }
+        
+        // Initialize
+        loadSessions();
+    </script>
+</body>
+</html>
+

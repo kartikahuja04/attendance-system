@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Already Marked</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #ff9800 0%, #f57c00 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        
+        .message-box {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            padding: 40px;
+            text-align: center;
+            max-width: 400px;
+        }
+        
+        .message-icon {
+            font-size: 64px;
+            color: #ff9800;
+            margin-bottom: 20px;
+        }
+        
+        .message-box h2 {
+            color: #333;
+            margin-bottom: 20px;
+            font-size: 24px;
+        }
+        
+        .message-box p {
+            color: #666;
+            margin-bottom: 10px;
+        }
+        
+        .message-box .info {
+            background: #fff3e0;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+            text-align: left;
+        }
+        
+        .message-box .info strong {
+            color: #333;
+        }
+    </style>
+</head>
+<body>
+    <div class="message-box">
+        <div class="message-icon">ℹ️</div>
+        <h2>Already Marked</h2>
+        <p>Your attendance was already recorded for this session.</p>
+        <div class="info">
+            <p><strong>Student ID:</strong> {{ student_id }}</p>
+            <p><strong>Session:</strong> {{ session_id }}</p>
+        </div>
+    </div>
+</body>
+</html>
+

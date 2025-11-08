@@ -2,3 +2,7 @@ fastapi
 uvicorn
 qrcode[pil]
 python-jose
+openpyxl
+python-multipart
+jinja2
+aiofiles
