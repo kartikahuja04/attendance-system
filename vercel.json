@@ -6,11 +6,6 @@
       "use": "@vercel/python"
     }
   ],
-  "functions": {
-    "backend/main.py": {
-      "runtime": "python3.11"
-    }
-  },
   "routes": [
     { "src": "/static/(.*)", "dest": "/static/$1" },
     { "src": "/(.*)", "dest": "backend/main.py" }
