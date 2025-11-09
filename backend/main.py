@@ -290,15 +290,17 @@ async def mark_attendance(token: str, student_id: str, request: Request):
             "error": "QR code expired. Please scan a fresh QR code."
         })
     
-    # Check if session is active
-    cursor.execute("SELECT status FROM sessions WHERE session_id=?", (session_id,))
-    session = cursor.fetchone()
-    
-    if not session or session[0] != 'active':
-        return templates.TemplateResponse("error.html", {
-            "request": request,
-            "error": "Session is not active"
-        })
+    # Check if session is active (allow bypass in serverless demo)
+    if os.getenv("ALLOW_MARK_WITHOUT_SESSION") == "1":
+        session = ("active",)
+    else:
+        cursor.execute("SELECT status FROM sessions WHERE session_id=?", (session_id,))
+        session = cursor.fetchone()
+        if not session or session[0] != 'active':
+            return templates.TemplateResponse("error.html", {
+                "request": request,
+                "error": "Session is not active"
+            })
     
     # Mark attendance
     try:
