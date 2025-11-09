@@ -11,18 +11,23 @@ from openpyxl.styles import Font, Alignment, PatternFill
 from openpyxl.utils import get_column_letter
 from typing import Optional
 
-from .db import conn, cursor
+try:
+    from backend.db import conn, cursor
+except Exception:  # fallback when executed within the package context
+    from .db import conn, cursor
 
 app = FastAPI()
 
-# Create static and templates directories if they don't exist
-os.makedirs("static", exist_ok=True)
-os.makedirs("templates", exist_ok=True)
+# Resolve absolute paths for static and templates based on project root
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+PROJECT_ROOT = os.path.abspath(os.path.join(BASE_DIR, os.pardir))
+STATIC_DIR = os.path.join(PROJECT_ROOT, "static")
+TEMPLATES_DIR = os.path.join(PROJECT_ROOT, "templates")
 
-# Mount static files
-app.mount("/static", StaticFiles(directory="static"), name="static")
+# Mount static files (directories are expected to exist in the deployment bundle)
+app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
-templates = Jinja2Templates(directory="templates")
+templates = Jinja2Templates(directory=TEMPLATES_DIR)
 
 # Simple session management (in production, use proper JWT tokens)
 def get_current_teacher(session_token: Optional[str] = Cookie(None)):
@@ -34,6 +39,16 @@ def get_current_teacher(session_token: Optional[str] = Cookie(None)):
         return {"id": teacher[0], "username": teacher[1]} if teacher else None
     except:
         return None
+
+# Health check
+@app.get("/api/health")
+async def health():
+    try:
+        cursor.execute("SELECT 1")
+        _ = cursor.fetchone()
+        return {"status": "ok"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"health_failed: {e}")
 
 # Home page - redirect to login
 @app.get("/", response_class=HTMLResponse)

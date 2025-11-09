@@ -1,8 +1,10 @@
 import sqlite3
 import hashlib
+import os
 
-# SQLite Database (local file)
-conn = sqlite3.connect("attendance.db", check_same_thread=False)
+# SQLite Database (local file or serverless tmp)
+db_path = os.getenv("DB_PATH") if os.getenv("DB_PATH") else ("/tmp/attendance.db" if os.getenv("VERCEL") else "attendance.db")
+conn = sqlite3.connect(db_path, check_same_thread=False)
 cursor = conn.cursor()
 
 # Create teachers table
