@@ -4,6 +4,7 @@ import os
 import re
 
 USE_POSTGRES = bool(os.getenv("DATABASE_URL"))
+DB_INIT_ERROR = None
 
 if USE_POSTGRES:
     import psycopg2
@@ -32,74 +33,104 @@ if USE_POSTGRES:
         def fetchall(self):
             return self._cur.fetchall()
 
-    dsn = os.getenv("DATABASE_URL")
-    # Ensure sslmode=require if not present (common for managed providers)
-    if "sslmode=" not in dsn:
-        if "?" in dsn:
-            dsn = f"{dsn}&sslmode=require"
-        else:
-            dsn = f"{dsn}?sslmode=require"
+    class FailingCursor:
+        def __init__(self, error_msg: str):
+            self._err = error_msg
+        def execute(self, *args, **kwargs):
+            raise RuntimeError(f"Database not initialized: {self._err}")
+        def executemany(self, *args, **kwargs):
+            raise RuntimeError(f"Database not initialized: {self._err}")
+        def fetchone(self):
+            raise RuntimeError(f"Database not initialized: {self._err}")
+        def fetchall(self):
+            raise RuntimeError(f"Database not initialized: {self._err}")
 
-    _conn = psycopg2.connect(dsn, cursor_factory=DictCursor)
-    _conn.autocommit = True
-    _cursor = _conn.cursor()
-    cursor = PlaceholderCursor(_cursor)
-    conn = _conn
+    try:
+        dsn = os.getenv("DATABASE_URL")
+        # Ensure sslmode=require if not present (common for managed providers)
+        if "sslmode=" not in dsn:
+            if "?" in dsn:
+                dsn = f"{dsn}&sslmode=require"
+            else:
+                dsn = f"{dsn}?sslmode=require"
 
-    # Initialize schema for Postgres
-    cursor.execute(
-        """
-        CREATE TABLE IF NOT EXISTS teachers (
-            id SERIAL PRIMARY KEY,
-            username TEXT UNIQUE NOT NULL,
-            password_hash TEXT NOT NULL,
-            created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
-        )
-        """
-    )
-    cursor.execute(
-        """
-        CREATE TABLE IF NOT EXISTS sessions (
-            id SERIAL PRIMARY KEY,
-            session_id TEXT UNIQUE NOT NULL,
-            teacher_id INTEGER NOT NULL REFERENCES teachers(id) ON DELETE CASCADE,
-            class_name TEXT NOT NULL,
-            subject TEXT NOT NULL,
-            section TEXT NOT NULL,
-            start_time TIMESTAMPTZ NOT NULL,
-            end_time TIMESTAMPTZ,
-            status TEXT DEFAULT 'active',
-            created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
-        )
-        """
-    )
-    cursor.execute(
-        """
-        CREATE TABLE IF NOT EXISTS attendance (
-            id SERIAL PRIMARY KEY,
-            session_id TEXT NOT NULL REFERENCES sessions(session_id) ON DELETE CASCADE,
-            student_id TEXT NOT NULL,
-            timestamp TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-            marked_by TEXT DEFAULT 'qr'
-        )
-        """
-    )
+        _conn = psycopg2.connect(dsn, cursor_factory=DictCursor)
+        _conn.autocommit = True
+        _cursor = _conn.cursor()
+        cursor = PlaceholderCursor(_cursor)
+        conn = _conn
 
-    # Default admin
-    default_password_hash = hashlib.sha256("admin123".encode()).hexdigest()
-    cursor.execute(
-        """
-        INSERT INTO teachers (username, password_hash)
-        VALUES ('admin', ?)
-        ON CONFLICT (username) DO NOTHING
-        """,
-        (default_password_hash,),
-    )
+        # Initialize schema for Postgres
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS teachers (
+                id SERIAL PRIMARY KEY,
+                username TEXT UNIQUE NOT NULL,
+                password_hash TEXT NOT NULL,
+                created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+            )
+            """
+        )
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS sessions (
+                id SERIAL PRIMARY KEY,
+                session_id TEXT UNIQUE NOT NULL,
+                teacher_id INTEGER NOT NULL REFERENCES teachers(id) ON DELETE CASCADE,
+                class_name TEXT NOT NULL,
+                subject TEXT NOT NULL,
+                section TEXT NOT NULL,
+                start_time TIMESTAMPTZ NOT NULL,
+                end_time TIMESTAMPTZ,
+                status TEXT DEFAULT 'active',
+                created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+            )
+            """
+        )
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS attendance (
+                id SERIAL PRIMARY KEY,
+                session_id TEXT NOT NULL REFERENCES sessions(session_id) ON DELETE CASCADE,
+                student_id TEXT NOT NULL,
+                timestamp TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+                marked_by TEXT DEFAULT 'qr'
+            )
+            """
+        )
+        # Unique index to prevent duplicates
+        cursor.execute(
+            """
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_attendance_session_student
+            ON attendance(session_id, student_id)
+            """
+        )
+
+        # Default admin
+        default_password_hash = hashlib.sha256("admin123".encode()).hexdigest()
+        cursor.execute(
+            """
+            INSERT INTO teachers (username, password_hash)
+            VALUES ('admin', ?)
+            ON CONFLICT (username) DO NOTHING
+            """,
+            (default_password_hash,),
+        )
+    except Exception as e:
+        DB_INIT_ERROR = str(e)
+        conn = None
+        cursor = FailingCursor(DB_INIT_ERROR)
 else:
     # SQLite Database (local file or serverless tmp)
     db_path = os.getenv("DB_PATH") if os.getenv("DB_PATH") else ("/tmp/attendance.db" if os.getenv("VERCEL") else "attendance.db")
     conn = sqlite3.connect(db_path, check_same_thread=False)
     cursor = conn.cursor()
+    # Enforce FKs and improve concurrency
+    try:
+        cursor.execute("PRAGMA foreign_keys=ON")
+        cursor.execute("PRAGMA journal_mode=WAL")
+    except Exception:
+        pass
 
     # Create teachers table
     cursor.execute("""
@@ -139,6 +170,11 @@ else:
         FOREIGN KEY (session_id) REFERENCES sessions(session_id)
     )
     """)
+    # Unique constraint to prevent duplicate marks
+    try:
+        cursor.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_attendance_session_student ON attendance(session_id, student_id)")
+    except Exception:
+        pass
 
     # Migration: ensure 'marked_by' column exists on 'attendance'
     try:

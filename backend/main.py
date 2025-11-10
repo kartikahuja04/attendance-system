@@ -5,6 +5,7 @@ from fastapi.templating import Jinja2Templates
 from datetime import datetime, timedelta
 import qrcode, io, base64, secrets
 import os
+import hmac
 import hashlib
 import openpyxl
 from openpyxl.styles import Font, Alignment, PatternFill
@@ -40,10 +41,23 @@ def get_current_teacher(session_token: Optional[str] = Cookie(None)):
     except:
         return None
 
+# Helper to normalize datetime values for JSON responses
+def _ts_str(v):
+    try:
+        if hasattr(v, 'strftime'):
+            return v.strftime('%Y-%m-%d %H:%M:%S')
+    except Exception:
+        pass
+    return str(v)
+
 # Health check
 @app.get("/api/health")
 async def health():
     try:
+        # Surface DB init errors clearly
+        from backend.db import DB_INIT_ERROR  # type: ignore
+        if DB_INIT_ERROR:
+            raise RuntimeError(f"DB_INIT_ERROR: {DB_INIT_ERROR}")
         cursor.execute("SELECT 1")
         _ = cursor.fetchone()
         return {"status": "ok"}
@@ -72,7 +86,15 @@ async def login(username: str = Form(...), password: str = Form(...)):
     
     if teacher:
         response = RedirectResponse(url="/dashboard", status_code=303)
-        response.set_cookie(key="session_token", value=str(teacher[0]), httponly=True)
+        # Cookie attributes for cross-domain (ngrok) and safer defaults
+        cookie_secure = os.getenv("COOKIE_SECURE", "0") == "1"
+        response.set_cookie(
+            key="session_token",
+            value=str(teacher[0]),
+            httponly=True,
+            samesite="lax",
+            secure=cookie_secure,
+        )
         return response
     else:
         raise HTTPException(status_code=401, detail="Invalid credentials")
@@ -112,7 +134,7 @@ async def get_active_sessions(teacher: Optional[dict] = Depends(get_current_teac
                 "class_name": s[1],
                 "subject": s[2],
                 "section": s[3],
-                "start_time": s[4],
+                "start_time": _ts_str(s[4]),
                 "status": s[5]
             }
             for s in sessions
@@ -140,8 +162,8 @@ async def get_all_sessions(teacher: Optional[dict] = Depends(get_current_teacher
                 "class_name": s[1],
                 "subject": s[2],
                 "section": s[3],
-                "start_time": s[4],
-                "end_time": s[5],
+                "start_time": _ts_str(s[4]),
+                "end_time": _ts_str(s[5]) if s[5] is not None else None,
                 "status": s[6]
             }
             for s in sessions
@@ -246,7 +268,10 @@ async def generate_qr(session_id: str, request: Request):
     # Generate new nonce each refresh
     nonce = secrets.token_hex(4)
     expiry = datetime.utcnow() + timedelta(seconds=30)
-    token = f"{session_id}:{nonce}:{int(expiry.timestamp())}"
+    token_payload = f"{session_id}:{nonce}:{int(expiry.timestamp())}"
+    secret = (os.getenv("SECRET_KEY") or "change-me").encode()
+    signature = hmac.new(secret, token_payload.encode(), hashlib.sha256).hexdigest()
+    token = f"{token_payload}:{signature}"
     
     # Determine base URL
     base_url = os.getenv("BASE_URL") or str(request.base_url).rstrip("/")
@@ -273,7 +298,22 @@ async def mark_attendance_form(token: str, request: Request):
 @app.get("/mark/{token}", response_class=HTMLResponse)
 async def mark_attendance(token: str, student_id: str, request: Request):
     try:
-        session_id, nonce, expiry = token.split(":")
+        parts = token.split(":")
+        if len(parts) == 4:
+            session_id, nonce, expiry, signature = parts
+            token_payload = f"{session_id}:{nonce}:{expiry}"
+            secret = (os.getenv("SECRET_KEY") or "change-me").encode()
+            expected_sig = hmac.new(secret, token_payload.encode(), hashlib.sha256).hexdigest()
+            if not hmac.compare_digest(signature, expected_sig):
+                return templates.TemplateResponse("error.html", {
+                    "request": request,
+                    "error": "Invalid QR token signature"
+                })
+        elif len(parts) == 3:
+            # Backwards compatibility (unsigned token)
+            session_id, nonce, expiry = parts
+        else:
+            raise ValueError("Invalid token format")
     except:
         return templates.TemplateResponse("error.html", {
             "request": request,
@@ -455,11 +495,14 @@ async def get_attendance_data(session_id: str, teacher: Optional[dict] = Depends
             "class_name": session[0],
             "subject": session[1],
             "section": session[2],
-            "start_time": session[3],
-            "end_time": session[4],
+            "start_time": _ts_str(session[3]),
+            "end_time": _ts_str(session[4]) if session[4] is not None else None,
             "status": session[5]
         },
-        "attendance": attendance_list,
+        "attendance": [
+            {"student_id": a["student_id"], "timestamp": _ts_str(a["timestamp"]), "marked_by": a["marked_by"]}
+            for a in attendance_list
+        ],
         "total_present": total_present,
         "total_absent": 0  # You can calculate this if you have a student list
     })
@@ -481,15 +524,16 @@ async def export_attendance(session_id: str, teacher: Optional[dict] = Depends(g
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
     
-    # Get attendance records
-    cursor.execute("""
-        SELECT student_id,
-               strftime('%Y-%m-%d %H:%M:%S', timestamp) as formatted_time,
-               marked_by
+    # Get attendance records (format timestamps in Python for cross-DB compatibility)
+    cursor.execute(
+        """
+        SELECT student_id, timestamp, marked_by
         FROM attendance
         WHERE session_id=?
         ORDER BY timestamp DESC
-    """, (session_id,))
+        """,
+        (session_id,)
+    )
     
     records = cursor.fetchall()
     
@@ -510,9 +554,9 @@ async def export_attendance(session_id: str, teacher: Optional[dict] = Depends(g
     ws['A3'] = "Section"
     ws['B3'] = session[2]
     ws['A4'] = "Start Time"
-    ws['B4'] = session[3]
+    ws['B4'] = _ts_str(session[3])
     ws['A5'] = "End Time"
-    ws['B5'] = session[4] if session[4] else "N/A"
+    ws['B5'] = _ts_str(session[4]) if session[4] else "N/A"
     ws['A6'] = "Total Present"
     ws['B6'] = len(records)
     
