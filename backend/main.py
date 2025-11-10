@@ -380,24 +380,27 @@ async def mark_attendance_manual(
 # Live attendance JSON API
 @app.get("/api/attendance/{session_id}")
 def api_attendance(session_id: str):
-    cursor.execute("""
-        SELECT student_id,
-               strftime('%Y-%m-%d %H:%M:%S', timestamp) as formatted_time,
-               marked_by
+    cursor.execute(
+        """
+        SELECT student_id, timestamp, marked_by
         FROM attendance
         WHERE session_id=?
         ORDER BY timestamp DESC
-    """, (session_id,))
-    
+        """,
+        (session_id,),
+    )
     rows = cursor.fetchall()
-    records = [
-        {"student_id": sid, "timestamp": ts, "marked_by": mb}
-        for (sid, ts, mb) in rows
-    ]
+    norm = []
+    for (sid, ts, mb) in rows:
+        if hasattr(ts, 'strftime'):
+            ts_str = ts.strftime('%Y-%m-%d %H:%M:%S')
+        else:
+            ts_str = str(ts)
+        norm.append({"student_id": sid, "timestamp": ts_str, "marked_by": mb})
     return JSONResponse({
         "session": session_id,
-        "total": len(records),
-        "records": records
+        "total": len(norm),
+        "records": norm
     })
 
 # View Attendance page
@@ -424,16 +427,16 @@ async def get_attendance_data(session_id: str, teacher: Optional[dict] = Depends
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
     
-    # Get attendance records
-    cursor.execute("""
-        SELECT student_id,
-               strftime('%Y-%m-%d %H:%M:%S', timestamp) as formatted_time,
-               marked_by
+    # Get attendance records (format timestamps in Python)
+    cursor.execute(
+        """
+        SELECT student_id, timestamp, marked_by
         FROM attendance
         WHERE session_id=?
         ORDER BY timestamp DESC
-    """, (session_id,))
-    
+        """,
+        (session_id,),
+    )
     records = cursor.fetchall()
     attendance_list = [
         {"student_id": r[0], "timestamp": r[1], "marked_by": r[2]}
@@ -524,10 +527,18 @@ async def export_attendance(session_id: str, teacher: Optional[dict] = Depends(g
         ws[col].alignment = Alignment(horizontal="center")
     
     # Attendance data
+    from datetime import datetime as _dt
     for idx, record in enumerate(records, start=9):
-        ws[f'A{idx}'] = record[0]
-        ws[f'B{idx}'] = record[1]
-        ws[f'C{idx}'] = record[2]
+        sid, ts, mb = record[0], record[1], record[2]
+        # Normalize timestamp to string
+        if hasattr(ts, 'strftime'):
+            ts_str = ts.strftime('%Y-%m-%d %H:%M:%S')
+        else:
+            # SQLite may store as string already
+            ts_str = str(ts)
+        ws[f'A{idx}'] = sid
+        ws[f'B{idx}'] = ts_str
+        ws[f'C{idx}'] = mb
     
     # Adjust column widths
     ws.column_dimensions['A'].width = 20
