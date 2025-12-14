@@ -1,7 +1,8 @@
-from fastapi import FastAPI, Request, Form, HTTPException, Depends, Cookie
+from fastapi import FastAPI, Request, Form, HTTPException, Depends, Cookie, UploadFile, File
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from fastapi.middleware.cors import CORSMiddleware
 from datetime import datetime, timedelta
 import qrcode, io, base64, secrets
 import os
@@ -11,6 +12,8 @@ import openpyxl
 from openpyxl.styles import Font, Alignment, PatternFill
 from openpyxl.utils import get_column_letter
 from typing import Optional
+import shutil
+import uuid
 
 try:
     from backend.db import conn, cursor
@@ -19,14 +22,29 @@ except Exception:  # fallback when executed within the package context
 
 app = FastAPI()
 
+# Add CORS middleware for React frontend
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],  # Vite dev server
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 # Resolve absolute paths for static and templates based on project root
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT = os.path.abspath(os.path.join(BASE_DIR, os.pardir))
 STATIC_DIR = os.path.join(PROJECT_ROOT, "static")
 TEMPLATES_DIR = os.path.join(PROJECT_ROOT, "templates")
+UPLOADS_DIR = os.path.join(PROJECT_ROOT, "uploads")
+
+# Create uploads directories if they don't exist
+os.makedirs(os.path.join(UPLOADS_DIR, "profile_pictures"), exist_ok=True)
+os.makedirs(os.path.join(UPLOADS_DIR, "resumes"), exist_ok=True)
 
 # Mount static files (directories are expected to exist in the deployment bundle)
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+app.mount("/uploads", StaticFiles(directory=UPLOADS_DIR), name="uploads")
 
 templates = Jinja2Templates(directory=TEMPLATES_DIR)
 
@@ -85,15 +103,20 @@ async def login(username: str = Form(...), password: str = Form(...)):
     teacher = cursor.fetchone()
     
     if teacher:
-        response = RedirectResponse(url="/dashboard", status_code=303)
-        # Cookie attributes for cross-domain (ngrok) and safer defaults
-        cookie_secure = os.getenv("COOKIE_SECURE", "0") == "1"
+        # Return JSON for React app instead of redirect
+        response = JSONResponse(content={
+            "success": True,
+            "message": "Login successful",
+            "user": {"id": teacher[0], "username": teacher[1]}
+        })
+        # Set cookie for authentication
         response.set_cookie(
             key="session_token",
             value=str(teacher[0]),
-            httponly=True,
-            samesite="lax",
-            secure=cookie_secure,
+            httponly=False,  # Allow JavaScript to read cookie
+            samesite="lax",  # Works on localhost
+            secure=False,  # HTTP is fine for localhost
+            max_age=86400
         )
         return response
     else:
@@ -113,6 +136,404 @@ async def dashboard(request: Request, teacher: Optional[dict] = Depends(get_curr
         return RedirectResponse(url="/login", status_code=303)
     return templates.TemplateResponse("dashboard.html", {"request": request, "teacher": teacher})
 
+# Get teacher's schedule for today
+@app.get("/api/teacher/schedule")
+async def get_teacher_schedule(teacher: Optional[dict] = Depends(get_current_teacher)):
+    if not teacher:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    
+    # Get today's day of week
+    from datetime import datetime
+    today = datetime.now().strftime('%A')
+    
+    # For demo purposes, return mock schedule based on day
+    # In production, this would query a teacher_schedule table
+    mock_schedules = {
+        'Monday': [
+            {'subject': 'Data Structures', 'subject_code': 'CS201', 'class_name': 'CSE-3A', 'time': '09:00-10:00'},
+            {'subject': 'Database Management', 'subject_code': 'CS301', 'class_name': 'CSE-4A', 'time': '11:00-12:00'},
+            {'subject': 'Web Development', 'subject_code': 'CS401', 'class_name': 'CSE-5A', 'time': '14:00-15:00'}
+        ],
+        'Tuesday': [
+            {'subject': 'Algorithms', 'subject_code': 'CS202', 'class_name': 'CSE-3B', 'time': '10:00-11:00'},
+            {'subject': 'Operating Systems', 'subject_code': 'CS302', 'class_name': 'CSE-4B', 'time': '13:00-14:00'}
+        ],
+        'Wednesday': [
+            {'subject': 'Data Structures', 'subject_code': 'CS201', 'class_name': 'CSE-3A', 'time': '09:00-10:00'},
+            {'subject': 'Database Management', 'subject_code': 'CS301', 'class_name': 'CSE-4A', 'time': '11:00-12:00'}
+        ],
+        'Thursday': [
+            {'subject': 'Web Development', 'subject_code': 'CS401', 'class_name': 'CSE-5A', 'time': '10:00-11:00'},
+            {'subject': 'Algorithms', 'subject_code': 'CS202', 'class_name': 'CSE-3B', 'time': '14:00-15:00'}
+        ],
+        'Friday': [
+            {'subject': 'Operating Systems', 'subject_code': 'CS302', 'class_name': 'CSE-4B', 'time': '09:00-10:00'},
+            {'subject': 'Data Structures', 'subject_code': 'CS201', 'class_name': 'CSE-3A', 'time': '11:00-12:00'}
+        ]
+    }
+    
+    schedule = mock_schedules.get(today, [])
+    return JSONResponse({"schedule": schedule, "day": today})
+
+# Get previous day statistics
+@app.get("/api/teacher/previous-day-stats")
+async def get_previous_day_stats(teacher: Optional[dict] = Depends(get_current_teacher)):
+    if not teacher:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    
+    # Get yesterday's date
+    from datetime import datetime, timedelta
+    yesterday = (datetime.now() - timedelta(days=1)).strftime('%Y-%m-%d')
+    
+    # Query sessions from yesterday
+    cursor.execute("""
+        SELECT s.subject, s.class_name, s.section, s.session_id
+        FROM sessions s
+        WHERE teacher_id=? AND DATE(start_time)=? AND status='ended'
+        ORDER BY start_time
+    """, (teacher["id"], yesterday))
+    
+    sessions = cursor.fetchall()
+    stats = []
+    
+    for session in sessions:
+        subject, class_name, section, session_id = session
+        subject_code = f"{class_name}-{section}"
+        
+        # Get attendance count for this session
+        cursor.execute("""
+            SELECT COUNT(DISTINCT student_id) as present
+            FROM attendance
+            WHERE session_id=?
+        """, (session_id,))
+        
+        present_count = cursor.fetchone()[0] or 0
+        
+        # Mock total students (in production, this would come from a class roster table)
+        total_students = 45 if 'CS201' in session_id else (48 if 'CS301' in session_id else 40)
+        absent_students = total_students - present_count
+        
+        stats.append({
+            'subject': subject,
+            'subject_code': subject_code,
+            'total_students': total_students,
+            'present_students': present_count,
+            'absent_students': absent_students
+        })
+    
+    # If no sessions yesterday, return mock data
+    if not stats:
+        stats = [
+            {'subject': 'Data Structures', 'subject_code': 'CS201', 'total_students': 45, 'present_students': 42, 'absent_students': 3},
+            {'subject': 'Database Management', 'subject_code': 'CS301', 'total_students': 48, 'present_students': 46, 'absent_students': 2},
+            {'subject': 'Web Development', 'subject_code': 'CS401', 'total_students': 40, 'present_students': 38, 'absent_students': 2}
+        ]
+    
+    return JSONResponse({"stats": stats, "date": yesterday})
+
+
+# ==================== TEACHER PROFILE & DIRECTORY ====================
+
+# Teacher Profile Page
+@app.get("/teacher/profile", response_class=HTMLResponse)
+async def teacher_profile_page(request: Request, teacher: Optional[dict] = Depends(get_current_teacher)):
+    if not teacher:
+        return RedirectResponse(url="/login", status_code=303)
+    
+    # Get full teacher profile
+    cursor.execute("""
+        SELECT id, username, employee_id, full_name, email, phone, department, designation,
+               qualification, education, subjects_taught, research_areas, publications, bio,
+               profile_picture_url, resume_url, linkedin_url, google_scholar_url, profile_visible
+        FROM teachers WHERE id=?
+    """, (teacher["id"],))
+    
+    row = cursor.fetchone()
+    if not row:
+        raise HTTPException(status_code=404, detail="Teacher not found")
+    
+    profile = {
+        "id": row[0],
+        "username": row[1],
+        "employee_id": row[2],
+        "full_name": row[3],
+        "email": row[4],
+        "phone": row[5],
+        "department": row[6],
+        "designation": row[7],
+        "qualification": row[8],
+        "education": row[9],
+        "subjects_taught": row[10],
+        "research_areas": row[11],
+        "publications": row[12],
+        "bio": row[13],
+        "profile_picture_url": row[14],
+        "resume_url": row[15],
+        "linkedin_url": row[16],
+        "google_scholar_url": row[17],
+        "profile_visible": row[18] if row[18] is not None else 1
+    }
+    
+    return templates.TemplateResponse("teacher_profile.html", {"request": request, "profile": profile})
+
+# Get Teacher Profile API
+@app.get("/api/teacher/profile")
+async def get_teacher_profile(teacher: Optional[dict] = Depends(get_current_teacher)):
+    if not teacher:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    
+    cursor.execute("""
+        SELECT id, username, employee_id, full_name, email, phone, department, designation,
+               qualification, education, subjects_taught, research_areas, publications, bio,
+               profile_picture_url, resume_url, linkedin_url, google_scholar_url, profile_visible
+        FROM teachers WHERE id=?
+    """, (teacher["id"],))
+    
+    row = cursor.fetchone()
+    if not row:
+        raise HTTPException(status_code=404, detail="Teacher not found")
+    
+    profile = {
+        "id": row[0],
+        "username": row[1],
+        "employee_id": row[2],
+        "full_name": row[3],
+        "email": row[4],
+        "phone": row[5],
+        "department": row[6],
+        "designation": row[7],
+        "qualification": row[8],
+        "education": row[9],
+        "subjects_taught": row[10],
+        "research_areas": row[11],
+        "publications": row[12],
+        "bio": row[13],
+        "profile_picture_url": row[14],
+        "resume_url": row[15],
+        "linkedin_url": row[16],
+        "google_scholar_url": row[17],
+        "profile_visible": row[18] if row[18] is not None else 1
+    }
+    
+    return JSONResponse({"profile": profile})
+
+# Update Teacher Profile
+@app.post("/api/teacher/profile/update")
+async def update_teacher_profile(
+    request: Request,
+    teacher: Optional[dict] = Depends(get_current_teacher),
+    full_name: str = Form(None),
+    employee_id: str = Form(None),
+    email: str = Form(None),
+    phone: str = Form(None),
+    department: str = Form(None),
+    designation: str = Form(None),
+    qualification: str = Form(None),
+    education: str = Form(None),
+    subjects_taught: str = Form(None),
+    research_areas: str = Form(None),
+    publications: str = Form(None),
+    bio: str = Form(None),
+    linkedin_url: str = Form(None),
+    google_scholar_url: str = Form(None)
+):
+    if not teacher:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    
+    try:
+        cursor.execute("""
+            UPDATE teachers SET
+                full_name=?, employee_id=?, email=?, phone=?, department=?, designation=?,
+                qualification=?, education=?, subjects_taught=?, research_areas=?,
+                publications=?, bio=?, linkedin_url=?, google_scholar_url=?
+            WHERE id=?
+        """, (full_name, employee_id, email, phone, department, designation,
+              qualification, education, subjects_taught, research_areas,
+              publications, bio, linkedin_url, google_scholar_url, teacher["id"]))
+        conn.commit()
+        
+        return JSONResponse({"success": True, "message": "Profile updated successfully"})
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Error updating profile: {str(e)}")
+
+# Upload Profile Picture
+@app.post("/api/teacher/profile/upload-photo")
+async def upload_profile_picture(
+    file: UploadFile = File(...),
+    teacher: Optional[dict] = Depends(get_current_teacher)
+):
+    if not teacher:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    
+    # Validate file type
+    allowed_types = ["image/jpeg", "image/jpg", "image/png", "image/webp"]
+    if file.content_type not in allowed_types:
+        raise HTTPException(status_code=400, detail="Invalid file type. Only JPG, PNG, and WebP are allowed.")
+    
+    # Validate file size (5MB max)
+    file_content = await file.read()
+    if len(file_content) > 5 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="File size exceeds 5MB limit")
+    
+    # Generate unique filename
+    file_ext = file.filename.split('.')[-1]
+    unique_filename = f"{teacher['id']}_{uuid.uuid4().hex[:8]}.{file_ext}"
+    file_path = os.path.join(UPLOADS_DIR, "profile_pictures", unique_filename)
+    
+    # Save file
+    with open(file_path, "wb") as f:
+        f.write(file_content)
+    
+    # Update database
+    profile_picture_url = f"/uploads/profile_pictures/{unique_filename}"
+    cursor.execute("UPDATE teachers SET profile_picture_url=? WHERE id=?", (profile_picture_url, teacher["id"]))
+    conn.commit()
+    
+    return JSONResponse({"success": True, "url": profile_picture_url})
+
+# Upload Resume
+@app.post("/api/teacher/profile/upload-resume")
+async def upload_resume(
+    file: UploadFile = File(...),
+    teacher: Optional[dict] = Depends(get_current_teacher)
+):
+    if not teacher:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    
+    # Validate file type
+    allowed_types = ["application/pdf", "application/msword", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"]
+    if file.content_type not in allowed_types:
+        raise HTTPException(status_code=400, detail="Invalid file type. Only PDF, DOC, and DOCX are allowed.")
+    
+    # Validate file size (10MB max)
+    file_content = await file.read()
+    if len(file_content) > 10 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="File size exceeds 10MB limit")
+    
+    # Generate unique filename
+    file_ext = file.filename.split('.')[-1]
+    unique_filename = f"{teacher['id']}_{uuid.uuid4().hex[:8]}.{file_ext}"
+    file_path = os.path.join(UPLOADS_DIR, "resumes", unique_filename)
+    
+    # Save file
+    with open(file_path, "wb") as f:
+        f.write(file_content)
+    
+    # Update database
+    resume_url = f"/uploads/resumes/{unique_filename}"
+    cursor.execute("UPDATE teachers SET resume_url=? WHERE id=?", (resume_url, teacher["id"]))
+    conn.commit()
+    
+    return JSONResponse({"success": True, "url": resume_url})
+
+# Toggle Profile Visibility
+@app.post("/api/teacher/profile/visibility")
+async def toggle_profile_visibility(
+    request: Request,
+    teacher: Optional[dict] = Depends(get_current_teacher)
+):
+    if not teacher:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    
+    data = await request.json()
+    visible = 1 if data.get("visible", True) else 0
+    
+    cursor.execute("UPDATE teachers SET profile_visible=? WHERE id=?", (visible, teacher["id"]))
+    conn.commit()
+    
+    return JSONResponse({"success": True, "visible": visible == 1})
+
+# Teacher Directory Page
+@app.get("/teacher/directory", response_class=HTMLResponse)
+async def teacher_directory_page(request: Request, teacher: Optional[dict] = Depends(get_current_teacher)):
+    if not teacher:
+        return RedirectResponse(url="/login", status_code=303)
+    return templates.TemplateResponse("teacher_directory.html", {"request": request})
+
+# Get All Teachers (Directory)
+@app.get("/api/teachers/directory")
+async def get_teachers_directory(teacher: Optional[dict] = Depends(get_current_teacher)):
+    if not teacher:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    
+    # Get all teachers with visible profiles
+    cursor.execute("""
+        SELECT id, username, full_name, email, phone, department, designation,
+               qualification, subjects_taught, research_areas, profile_picture_url, profile_visible
+        FROM teachers
+        WHERE profile_visible=1 OR id=?
+        ORDER BY full_name, username
+    """, (teacher["id"],))
+    
+    rows = cursor.fetchall()
+    teachers = []
+    
+    for row in rows:
+        teachers.append({
+            "id": row[0],
+            "username": row[1],
+            "full_name": row[2],
+            "email": row[3],
+            "phone": row[4],
+            "department": row[5],
+            "designation": row[6],
+            "qualification": row[7],
+            "subjects_taught": row[8],
+            "research_areas": row[9],
+            "profile_picture_url": row[10],
+            "profile_visible": row[11]
+        })
+    
+    return JSONResponse({"teachers": teachers})
+
+# Get Specific Teacher Profile
+@app.get("/api/teachers/{teacher_id}/profile")
+async def get_specific_teacher_profile(
+    teacher_id: int,
+    teacher: Optional[dict] = Depends(get_current_teacher)
+):
+    if not teacher:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    
+    cursor.execute("""
+        SELECT id, username, full_name, email, phone, department, designation,
+               qualification, education, subjects_taught, research_areas, publications, bio,
+               profile_picture_url, linkedin_url, google_scholar_url, profile_visible
+        FROM teachers WHERE id=?
+    """, (teacher_id,))
+    
+    row = cursor.fetchone()
+    if not row:
+        raise HTTPException(status_code=404, detail="Teacher not found")
+    
+    # Check if profile is visible (or if it's the current user's own profile)
+    if row[16] == 0 and row[0] != teacher["id"]:
+        raise HTTPException(status_code=403, detail="Profile is not visible")
+    
+    teacher_data = {
+        "id": row[0],
+        "username": row[1],
+        "full_name": row[2],
+        "email": row[3],
+        "phone": row[4],
+        "department": row[5],
+        "designation": row[6],
+        "qualification": row[7],
+        "education": row[8],
+        "subjects_taught": row[9],
+        "research_areas": row[10],
+        "publications": row[11],
+        "bio": row[12],
+        "profile_picture_url": row[13],
+        "linkedin_url": row[14],
+        "google_scholar_url": row[15],
+        "profile_visible": row[16]
+    }
+    
+    return JSONResponse({"teacher": teacher_data})
+
+
+
 # Get active sessions for teacher
 @app.get("/api/sessions/active")
 async def get_active_sessions(teacher: Optional[dict] = Depends(get_current_teacher)):
@@ -130,11 +551,12 @@ async def get_active_sessions(teacher: Optional[dict] = Depends(get_current_teac
     return JSONResponse({
         "sessions": [
             {
-                "session_id": s[0],
+                "id": s[0],  # Changed from session_id
                 "class_name": s[1],
                 "subject": s[2],
+                "subject_code": s[2],  # Use subject as subject_code
                 "section": s[3],
-                "start_time": _ts_str(s[4]),
+                "date": _ts_str(s[4]),  # Changed from start_time
                 "status": s[5]
             }
             for s in sessions

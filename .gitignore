@@ -12,6 +12,7 @@ eggs/
 .eggs/
 lib/
 lib64/
+!quickmark_app/lib/
 parts/
 sdist/
 var/

@@ -1,0 +1,603 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teacher Directory - Attendance System</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #E8F4F8;
+            min-height: 100vh;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #2C5F7C 0%, #3B7A9E 100%);
+            color: white;
+            padding: 20px 40px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.15);
+        }
+
+        .header h1 {
+            font-size: 24px;
+            font-weight: 600;
+        }
+
+        .back-btn {
+            background: white;
+            color: #2C5F7C;
+            padding: 10px 24px;
+            border-radius: 6px;
+            text-decoration: none;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+
+        .back-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 30px auto;
+            padding: 0 20px;
+        }
+
+        .search-card {
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+            margin-bottom: 30px;
+        }
+
+        .search-form {
+            display: grid;
+            grid-template-columns: 2fr 1fr 1fr auto;
+            gap: 15px;
+            align-items: end;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .form-label {
+            font-size: 14px;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .form-input,
+        .form-select {
+            padding: 12px 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.2s;
+        }
+
+        .form-input:focus,
+        .form-select:focus {
+            outline: none;
+            border-color: #2C5F7C;
+        }
+
+        .btn-search {
+            background: linear-gradient(135deg, #2C5F7C 0%, #3B7A9E 100%);
+            color: white;
+            padding: 12px 30px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-search:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(44, 95, 124, 0.35);
+        }
+
+        .results-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .results-count {
+            font-size: 18px;
+            color: #666;
+        }
+
+        .teachers-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+            gap: 25px;
+        }
+
+        .teacher-card {
+            background: white;
+            border-radius: 12px;
+            padding: 25px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+            transition: all 0.3s;
+            cursor: pointer;
+        }
+
+        .teacher-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.15);
+        }
+
+        .teacher-card-header {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+
+        .teacher-avatar {
+            width: 70px;
+            height: 70px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #5AB1BB 0%, #3E93A0 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 28px;
+            font-weight: 600;
+            color: white;
+            flex-shrink: 0;
+            object-fit: cover;
+        }
+
+        .teacher-info {
+            flex: 1;
+        }
+
+        .teacher-name {
+            font-size: 20px;
+            font-weight: 700;
+            color: #2C5F7C;
+            margin-bottom: 4px;
+        }
+
+        .teacher-designation {
+            font-size: 14px;
+            color: #666;
+        }
+
+        .teacher-department {
+            font-size: 13px;
+            color: #888;
+            margin-top: 2px;
+        }
+
+        .teacher-details {
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid #f0f0f0;
+        }
+
+        .detail-row {
+            margin-bottom: 10px;
+        }
+
+        .detail-label {
+            font-size: 12px;
+            font-weight: 600;
+            color: #888;
+            text-transform: uppercase;
+            margin-bottom: 5px;
+        }
+
+        .badge-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+
+        .badge {
+            background: #E8F4F8;
+            color: #2C5F7C;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        .view-profile-btn {
+            width: 100%;
+            background: #f0f0f0;
+            color: #2C5F7C;
+            padding: 10px;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-top: 15px;
+            transition: background 0.3s;
+        }
+
+        .view-profile-btn:hover {
+            background: #e0e0e0;
+        }
+
+        .no-results {
+            text-align: center;
+            padding: 60px 20px;
+            color: #888;
+        }
+
+        .no-results-icon {
+            font-size: 64px;
+            margin-bottom: 20px;
+        }
+
+        /* Modal Styles */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0, 0, 0, 0.5);
+        }
+
+        .modal-content {
+            background-color: white;
+            margin: 50px auto;
+            padding: 0;
+            border-radius: 12px;
+            width: 90%;
+            max-width: 800px;
+            max-height: 85vh;
+            overflow-y: auto;
+        }
+
+        .modal-header {
+            background: linear-gradient(135deg, #2C5F7C 0%, #3B7A9E 100%);
+            color: white;
+            padding: 20px 30px;
+            border-radius: 12px 12px 0 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-header h2 {
+            margin: 0;
+            font-size: 24px;
+        }
+
+        .close-btn {
+            color: white;
+            font-size: 32px;
+            font-weight: bold;
+            cursor: pointer;
+            background: none;
+            border: none;
+        }
+
+        .close-btn:hover {
+            opacity: 0.8;
+        }
+
+        .modal-body {
+            padding: 30px;
+        }
+
+        @media (max-width: 768px) {
+            .search-form {
+                grid-template-columns: 1fr;
+            }
+
+            .teachers-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="header">
+        <h1>👥 Teacher Directory</h1>
+        <a href="/dashboard" class="back-btn">← Back to Dashboard</a>
+    </div>
+
+    <div class="container">
+        <!-- Search Section -->
+        <div class="search-card">
+            <form id="search-form" class="search-form">
+                <div class="form-group">
+                    <label class="form-label">Search by Name</label>
+                    <input type="text" id="search-name" class="form-input" placeholder="Enter teacher name...">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Department</label>
+                    <select id="search-department" class="form-select">
+                        <option value="">All Departments</option>
+                        <option value="Computer Science">Computer Science</option>
+                        <option value="Mathematics">Mathematics</option>
+                        <option value="Physics">Physics</option>
+                        <option value="Chemistry">Chemistry</option>
+                        <option value="Electronics">Electronics</option>
+                        <option value="Mechanical">Mechanical</option>
+                        <option value="Civil">Civil</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Research Area</label>
+                    <input type="text" id="search-research" class="form-input" placeholder="e.g., Machine Learning">
+                </div>
+                <button type="submit" class="btn-search">🔍 Search</button>
+            </form>
+        </div>
+
+        <!-- Results Section -->
+        <div class="results-header">
+            <h2 class="results-count" id="results-count">Loading teachers...</h2>
+        </div>
+
+        <div class="teachers-grid" id="teachers-grid">
+            <!-- Teacher cards will be inserted here -->
+        </div>
+
+        <div class="no-results" id="no-results" style="display: none;">
+            <div class="no-results-icon">🔍</div>
+            <h3>No teachers found</h3>
+            <p>Try adjusting your search criteria</p>
+        </div>
+    </div>
+
+    <!-- Teacher Profile Modal -->
+    <div id="teacher-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modal-title">Teacher Profile</h2>
+                <button class="close-btn" onclick="closeModal()">&times;</button>
+            </div>
+            <div class="modal-body" id="modal-body">
+                <!-- Profile details will be loaded here -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let allTeachers = [];
+
+        // Load all teachers on page load
+        async function loadTeachers() {
+            try {
+                const response = await fetch('/api/teachers/directory');
+                const data = await response.json();
+                allTeachers = data.teachers || [];
+                displayTeachers(allTeachers);
+            } catch (error) {
+                console.error('Error loading teachers:', error);
+                document.getElementById('results-count').textContent = 'Error loading teachers';
+            }
+        }
+
+        // Display teachers in grid
+        function displayTeachers(teachers) {
+            const grid = document.getElementById('teachers-grid');
+            const noResults = document.getElementById('no-results');
+            const resultsCount = document.getElementById('results-count');
+
+            if (teachers.length === 0) {
+                grid.style.display = 'none';
+                noResults.style.display = 'block';
+                resultsCount.textContent = 'No teachers found';
+                return;
+            }
+
+            grid.style.display = 'grid';
+            noResults.style.display = 'none';
+            resultsCount.textContent = `Found ${teachers.length} teacher${teachers.length !== 1 ? 's' : ''}`;
+
+            grid.innerHTML = teachers.map(teacher => `
+                <div class="teacher-card" onclick="viewTeacherProfile(${teacher.id})">
+                    <div class="teacher-card-header">
+                        ${teacher.profile_picture_url
+                    ? `<img src="${teacher.profile_picture_url}" alt="${teacher.full_name || teacher.username}" class="teacher-avatar">`
+                    : `<div class="teacher-avatar">${(teacher.full_name || teacher.username)[0].toUpperCase()}</div>`
+                }
+                        <div class="teacher-info">
+                            <div class="teacher-name">${teacher.full_name || teacher.username}</div>
+                            <div class="teacher-designation">${teacher.designation || 'Teacher'}</div>
+                            <div class="teacher-department">${teacher.department || 'Department not specified'}</div>
+                        </div>
+                    </div>
+                    <div class="teacher-details">
+                        ${teacher.research_areas ? `
+                            <div class="detail-row">
+                                <div class="detail-label">Research Areas</div>
+                                <div class="badge-container">
+                                    ${teacher.research_areas.split(',').slice(0, 3).map(area =>
+                    `<span class="badge">${area.trim()}</span>`
+                ).join('')}
+                                    ${teacher.research_areas.split(',').length > 3 ? '<span class="badge">+more</span>' : ''}
+                                </div>
+                            </div>
+                        ` : ''}
+                        ${teacher.subjects_taught ? `
+                            <div class="detail-row">
+                                <div class="detail-label">Subjects</div>
+                                <div class="badge-container">
+                                    ${teacher.subjects_taught.split(',').slice(0, 2).map(subject =>
+                    `<span class="badge">${subject.trim()}</span>`
+                ).join('')}
+                                    ${teacher.subjects_taught.split(',').length > 2 ? '<span class="badge">+more</span>' : ''}
+                                </div>
+                            </div>
+                        ` : ''}
+                    </div>
+                    <button class="view-profile-btn" onclick="event.stopPropagation(); viewTeacherProfile(${teacher.id})">
+                        View Full Profile →
+                    </button>
+                </div>
+            `).join('');
+        }
+
+        // Search form submission
+        document.getElementById('search-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const name = document.getElementById('search-name').value.trim();
+            const department = document.getElementById('search-department').value;
+            const research = document.getElementById('search-research').value.trim();
+
+            // Filter locally
+            let filtered = allTeachers;
+
+            if (name) {
+                filtered = filtered.filter(t =>
+                    (t.full_name || t.username).toLowerCase().includes(name.toLowerCase())
+                );
+            }
+
+            if (department) {
+                filtered = filtered.filter(t => t.department === department);
+            }
+
+            if (research) {
+                filtered = filtered.filter(t =>
+                    t.research_areas && t.research_areas.toLowerCase().includes(research.toLowerCase())
+                );
+            }
+
+            displayTeachers(filtered);
+        });
+
+        // View teacher profile in modal
+        async function viewTeacherProfile(teacherId) {
+            try {
+                const response = await fetch(`/api/teachers/${teacherId}/profile`);
+                const data = await response.json();
+                const teacher = data.teacher;
+
+                document.getElementById('modal-title').textContent = teacher.full_name || teacher.username;
+
+                const modalBody = document.getElementById('modal-body');
+                modalBody.innerHTML = `
+                    <div style="text-align: center; margin-bottom: 30px;">
+                        ${teacher.profile_picture_url
+                        ? `<img src="${teacher.profile_picture_url}" alt="${teacher.full_name || teacher.username}" style="width: 150px; height: 150px; border-radius: 50%; object-fit: cover; border: 5px solid #E8F4F8;">`
+                        : `<div style="width: 150px; height: 150px; border-radius: 50%; background: linear-gradient(135deg, #5AB1BB 0%, #3E93A0 100%); display: inline-flex; align-items: center; justify-content: center; font-size: 60px; font-weight: 600; color: white; border: 5px solid #E8F4F8;">${(teacher.full_name || teacher.username)[0].toUpperCase()}</div>`
+                    }
+                        <h3 style="margin-top: 15px; color: #2C5F7C;">${teacher.designation || 'Teacher'}</h3>
+                        <p style="color: #666;">${teacher.department || 'Department not specified'}</p>
+                    </div>
+
+                    ${teacher.email || teacher.phone ? `
+                        <div style="margin-bottom: 25px;">
+                            <h3 style="color: #2C5F7C; margin-bottom: 10px;">Contact Information</h3>
+                            ${teacher.email ? `<p>📧 ${teacher.email}</p>` : ''}
+                            ${teacher.phone ? `<p>📱 ${teacher.phone}</p>` : ''}
+                        </div>
+                    ` : ''}
+
+                    ${teacher.qualification ? `
+                        <div style="margin-bottom: 25px;">
+                            <h3 style="color: #2C5F7C; margin-bottom: 10px;">Qualification</h3>
+                            <p>${teacher.qualification}</p>
+                        </div>
+                    ` : ''}
+
+                    ${teacher.education ? `
+                        <div style="margin-bottom: 25px;">
+                            <h3 style="color: #2C5F7C; margin-bottom: 10px;">Education</h3>
+                            <p style="white-space: pre-line;">${teacher.education}</p>
+                        </div>
+                    ` : ''}
+
+                    ${teacher.subjects_taught ? `
+                        <div style="margin-bottom: 25px;">
+                            <h3 style="color: #2C5F7C; margin-bottom: 10px;">Subjects Taught</h3>
+                            <div class="badge-container">
+                                ${teacher.subjects_taught.split(',').map(subject =>
+                        `<span class="badge">${subject.trim()}</span>`
+                    ).join('')}
+                            </div>
+                        </div>
+                    ` : ''}
+
+                    ${teacher.research_areas ? `
+                        <div style="margin-bottom: 25px;">
+                            <h3 style="color: #2C5F7C; margin-bottom: 10px;">Research Areas</h3>
+                            <div class="badge-container">
+                                ${teacher.research_areas.split(',').map(area =>
+                        `<span class="badge">${area.trim()}</span>`
+                    ).join('')}
+                            </div>
+                        </div>
+                    ` : ''}
+
+                    ${teacher.bio ? `
+                        <div style="margin-bottom: 25px;">
+                            <h3 style="color: #2C5F7C; margin-bottom: 10px;">Biography</h3>
+                            <p style="line-height: 1.6;">${teacher.bio}</p>
+                        </div>
+                    ` : ''}
+
+                    ${teacher.publications ? `
+                        <div style="margin-bottom: 25px;">
+                            <h3 style="color: #2C5F7C; margin-bottom: 10px;">Publications</h3>
+                            <ul style="list-style: none; padding: 0;">
+                                ${teacher.publications.split('|||').map(pub =>
+                        `<li style="padding: 10px; background: #f9f9f9; border-radius: 6px; margin-bottom: 8px; border-left: 4px solid #2C5F7C;">📄 ${pub.trim()}</li>`
+                    ).join('')}
+                            </ul>
+                        </div>
+                    ` : ''}
+
+                    ${teacher.linkedin_url || teacher.google_scholar_url ? `
+                        <div style="margin-bottom: 25px;">
+                            <h3 style="color: #2C5F7C; margin-bottom: 10px;">Professional Links</h3>
+                            ${teacher.linkedin_url ? `<p><a href="${teacher.linkedin_url}" target="_blank" style="color: #2C5F7C;">🔗 LinkedIn Profile</a></p>` : ''}
+                            ${teacher.google_scholar_url ? `<p><a href="${teacher.google_scholar_url}" target="_blank" style="color: #2C5F7C;">🎓 Google Scholar</a></p>` : ''}
+                        </div>
+                    ` : ''}
+                `;
+
+                document.getElementById('teacher-modal').style.display = 'block';
+            } catch (error) {
+                console.error('Error loading teacher profile:', error);
+                alert('Failed to load teacher profile');
+            }
+        }
+
+        function closeModal() {
+            document.getElementById('teacher-modal').style.display = 'none';
+        }
+
+        // Close modal when clicking outside
+        window.onclick = function (event) {
+            const modal = document.getElementById('teacher-modal');
+            if (event.target === modal) {
+                closeModal();
+            }
+        }
+
+        // Load teachers on page load
+        loadTeachers();
+    </script>
+</body>
+
+</html>

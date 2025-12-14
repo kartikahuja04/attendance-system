@@ -185,6 +185,39 @@ else:
     except Exception:
         pass
 
+    # Migration: Add profile fields to teachers table
+    try:
+        cursor.execute("PRAGMA table_info(teachers)")
+        existing_cols = [row[1] for row in cursor.fetchall()]
+        
+        # Define new profile columns
+        profile_columns = {
+            'employee_id': 'TEXT',
+            'full_name': 'TEXT',
+            'email': 'TEXT',
+            'phone': 'TEXT',
+            'department': 'TEXT',
+            'designation': 'TEXT',
+            'qualification': 'TEXT',
+            'education': 'TEXT',
+            'subjects_taught': 'TEXT',
+            'research_areas': 'TEXT',
+            'publications': 'TEXT',
+            'bio': 'TEXT',
+            'profile_picture_url': 'TEXT',
+            'resume_url': 'TEXT',
+            'linkedin_url': 'TEXT',
+            'google_scholar_url': 'TEXT',
+            'profile_visible': 'INTEGER DEFAULT 1'  # 1 = visible, 0 = hidden
+        }
+        
+        # Add missing columns
+        for col_name, col_type in profile_columns.items():
+            if col_name not in existing_cols:
+                cursor.execute(f"ALTER TABLE teachers ADD COLUMN {col_name} {col_type}")
+    except Exception as e:
+        print(f"Profile migration warning: {e}")
+
     # Default admin
     default_password_hash = hashlib.sha256("admin123".encode()).hexdigest()
     cursor.execute(

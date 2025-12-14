@@ -1,186 +1,342 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Teacher Login - Attendance System</title>
     <link rel="stylesheet" href="/static/style.css">
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, var(--primary-dark) 0%, var(--primary) 100%);
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             min-height: 100vh;
             display: flex;
             justify-content: center;
             align-items: center;
             padding: 20px;
+            position: relative;
+            overflow: hidden;
         }
-        
+
+        /* Animated Background Circles */
+        body::before,
+        body::after {
+            content: '';
+            position: absolute;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.1);
+            animation: float 6s ease-in-out infinite;
+        }
+
+        body::before {
+            width: 400px;
+            height: 400px;
+            top: -200px;
+            left: -200px;
+            animation-delay: 0s;
+        }
+
+        body::after {
+            width: 300px;
+            height: 300px;
+            bottom: -150px;
+            right: -150px;
+            animation-delay: 2s;
+        }
+
         .login-container {
-            background: white;
-            border-radius: 20px;
+            background: rgba(255, 255, 255, 0.15);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 24px;
             box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-            padding: 40px;
+            padding: 50px 40px;
             width: 100%;
-            max-width: 400px;
-            animation: slideIn 0.5s ease-out;
+            max-width: 450px;
+            position: relative;
+            z-index: 1;
+            animation: scaleIn 0.6s ease-out;
         }
-        
-        @keyframes slideIn {
-            from {
-                opacity: 0;
-                transform: translateY(-20px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-        
+
         .login-header {
             text-align: center;
-            margin-bottom: 30px;
+            margin-bottom: 40px;
         }
-        
+
+        .logo {
+            width: 80px;
+            height: 80px;
+            margin: 0 auto 20px;
+            background: linear-gradient(135deg, #fff 0%, rgba(255, 255, 255, 0.8) 100%);
+            border-radius: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 40px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            animation: float 3s ease-in-out infinite;
+        }
+
         .login-header h1 {
-            color: #333;
-            font-size: 28px;
-            margin-bottom: 10px;
-        }
-        
-        .login-header p {
-            color: #666;
-            font-size: 14px;
-        }
-        
-        .form-group {
-            margin-bottom: 20px;
-        }
-        
-        .form-group label {
-            display: block;
+            color: #fff;
+            font-size: 32px;
+            font-weight: 800;
             margin-bottom: 8px;
-            color: #333;
+            text-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+        }
+
+        .login-header p {
+            color: rgba(255, 255, 255, 0.9);
+            font-size: 16px;
             font-weight: 500;
         }
-        
+
+        .form-group {
+            margin-bottom: 24px;
+            position: relative;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 10px;
+            color: #fff;
+            font-weight: 600;
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .input-wrapper {
+            position: relative;
+        }
+
+        .input-icon {
+            position: absolute;
+            left: 16px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 20px;
+            color: rgba(102, 126, 234, 0.6);
+        }
+
         .form-group input {
             width: 100%;
-            padding: 12px 15px;
-            border: 2px solid #e0e0e0;
-            border-radius: 8px;
+            padding: 16px 16px 16px 50px;
+            background: rgba(255, 255, 255, 0.95);
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 12px;
             font-size: 16px;
-            transition: border-color 0.3s;
+            color: #333;
+            transition: all 0.3s ease;
         }
-        
+
         .form-group input:focus {
             outline: none;
-            border-color: var(--primary);
+            background: #fff;
+            border-color: rgba(255, 255, 255, 0.8);
+            box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.2);
         }
-        
+
+        .form-group input::placeholder {
+            color: rgba(0, 0, 0, 0.4);
+        }
+
         .login-btn {
             width: 100%;
-            padding: 14px;
-            background: linear-gradient(135deg, var(--primary-dark) 0%, var(--primary) 100%);
-            color: white;
+            padding: 18px;
+            background: linear-gradient(135deg, #fff 0%, rgba(255, 255, 255, 0.9) 100%);
+            color: #667eea;
             border: none;
-            border-radius: 8px;
-            font-size: 16px;
-            font-weight: 600;
+            border-radius: 12px;
+            font-size: 18px;
+            font-weight: 700;
             cursor: pointer;
-            transition: transform 0.2s, box-shadow 0.2s;
+            transition: all 0.3s ease;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            position: relative;
+            overflow: hidden;
         }
-        
+
+        .login-btn::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 0;
+            height: 0;
+            border-radius: 50%;
+            background: rgba(102, 126, 234, 0.2);
+            transform: translate(-50%, -50%);
+            transition: width 0.6s, height 0.6s;
+        }
+
+        .login-btn:hover::before {
+            width: 300px;
+            height: 300px;
+        }
+
         .login-btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+            transform: translateY(-3px);
+            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.3);
         }
-        
+
         .login-btn:active {
-            transform: translateY(0);
+            transform: translateY(-1px);
         }
-        
+
+        .login-btn span {
+            position: relative;
+            z-index: 1;
+        }
+
         .error-message {
-            background: #fee;
-            color: #c33;
-            padding: 12px;
-            border-radius: 8px;
-            margin-bottom: 20px;
+            background: rgba(255, 107, 157, 0.2);
+            backdrop-filter: blur(10px);
+            color: #fff;
+            padding: 14px 18px;
+            border-radius: 10px;
+            margin-bottom: 24px;
             display: none;
+            border: 1px solid rgba(255, 107, 157, 0.4);
+            animation: slideInLeft 0.4s ease-out;
         }
-        
+
         .info-box {
-            background: var(--primary-light);
-            border-left: 4px solid var(--primary);
-            padding: 12px;
-            border-radius: 4px;
-            margin-top: 20px;
-            font-size: 13px;
-            color: #555;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-left: 4px solid rgba(255, 255, 255, 0.5);
+            padding: 16px;
+            border-radius: 10px;
+            margin-top: 24px;
+            font-size: 14px;
+            color: rgba(255, 255, 255, 0.95);
+            line-height: 1.6;
+        }
+
+        .info-box strong {
+            color: #fff;
+            display: block;
+            margin-bottom: 8px;
+        }
+
+        /* Loading State */
+        .login-btn.loading {
+            pointer-events: none;
+            opacity: 0.7;
+        }
+
+        .login-btn.loading::after {
+            content: '';
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            top: 50%;
+            left: 50%;
+            margin-left: -10px;
+            margin-top: -10px;
+            border: 3px solid rgba(102, 126, 234, 0.3);
+            border-radius: 50%;
+            border-top-color: #667eea;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @media (max-width: 480px) {
+            .login-container {
+                padding: 40px 30px;
+            }
+
+            .login-header h1 {
+                font-size: 28px;
+            }
+
+            .logo {
+                width: 70px;
+                height: 70px;
+                font-size: 35px;
+            }
         }
     </style>
 </head>
+
 <body>
-    <div class="login-container">
+    <div class="login-container animate-scaleIn">
         <div class="login-header">
-            <h1>📚 Teacher Portal</h1>
+            <div class="logo">📚</div>
+            <h1>Teacher Portal</h1>
             <p>Attendance Management System</p>
         </div>
-        
+
         <div class="error-message" id="errorMessage"></div>
-        
+
         <form id="loginForm" action="/api/login" method="POST">
             <div class="form-group">
                 <label for="username">Username</label>
-                <input type="text" id="username" name="username" required autofocus>
+                <div class="input-wrapper">
+                    <span class="input-icon">👤</span>
+                    <input type="text" id="username" name="username" placeholder="Enter your username" required
+                        autofocus>
+                </div>
             </div>
-            
+
             <div class="form-group">
                 <label for="password">Password</label>
-                <input type="password" id="password" name="password" required>
+                <div class="input-wrapper">
+                    <span class="input-icon">🔒</span>
+                    <input type="password" id="password" name="password" placeholder="Enter your password" required>
+                </div>
             </div>
-            
-            <button type="submit" class="login-btn">Login</button>
+
+            <button type="submit" class="login-btn">
+                <span>Login to Dashboard</span>
+            </button>
         </form>
-        
+
         <div class="info-box">
-            <strong>Default Credentials:</strong><br>
-            Username: admin<br>
-            Password: admin123
+            <strong>🔑 Default Credentials</strong>
+            <div>Username: <strong>admin</strong></div>
+            <div>Password: <strong>admin123</strong></div>
         </div>
     </div>
-    
+
     <script>
-        document.getElementById('loginForm').addEventListener('submit', async function(e) {
+        document.getElementById('loginForm').addEventListener('submit', async function (e) {
             e.preventDefault();
             const formData = new FormData(this);
             const errorDiv = document.getElementById('errorMessage');
-            
+            const submitBtn = this.querySelector('.login-btn');
+
+            // Add loading state
+            submitBtn.classList.add('loading');
+            submitBtn.querySelector('span').textContent = 'Logging in...';
+            errorDiv.style.display = 'none';
+
             try {
                 const response = await fetch('/api/login', {
                     method: 'POST',
                     body: formData
                 });
-                
+
                 if (response.ok) {
-                    window.location.href = '/dashboard';
+                    submitBtn.querySelector('span').textContent = 'Success! Redirecting...';
+                    setTimeout(() => {
+                        window.location.href = '/dashboard';
+                    }, 500);
                 } else {
                     const data = await response.json();
-                    errorDiv.textContent = data.detail || 'Invalid credentials';
+                    errorDiv.textContent = '❌ ' + (data.detail || 'Invalid credentials. Please try again.');
                     errorDiv.style.display = 'block';
+                    submitBtn.classList.remove('loading');
+                    submitBtn.querySelector('span').textContent = 'Login to Dashboard';
                 }
             } catch (error) {
-                errorDiv.textContent = 'An error occurred. Please try again.';
+                errorDiv.textContent = '❌ An error occurred. Please try again.';
                 errorDiv.style.display = 'block';
+                submitBtn.classList.remove('loading');
+                submitBtn.querySelector('span').textContent = 'Login to Dashboard';
             }
         });
     </script>
 </body>
-</html>
 
+</html>

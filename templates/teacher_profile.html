@@ -1,0 +1,739 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teacher Profile - Attendance System</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #E8F4F8;
+            min-height: 100vh;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #2C5F7C 0%, #3B7A9E 100%);
+            color: white;
+            padding: 20px 40px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.15);
+        }
+
+        .header h1 {
+            font-size: 24px;
+            font-weight: 600;
+        }
+
+        .back-btn {
+            background: white;
+            color: #2C5F7C;
+            padding: 10px 24px;
+            border-radius: 6px;
+            text-decoration: none;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+
+        .back-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 30px auto;
+            padding: 0 20px;
+        }
+
+        .profile-card {
+            background: white;
+            border-radius: 12px;
+            padding: 40px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+            margin-bottom: 20px;
+        }
+
+        .profile-header {
+            display: flex;
+            align-items: flex-start;
+            gap: 30px;
+            margin-bottom: 30px;
+            padding-bottom: 30px;
+            border-bottom: 2px solid #E8F4F8;
+        }
+
+        .profile-picture-section {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .profile-picture {
+            width: 150px;
+            height: 150px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #5AB1BB 0%, #3E93A0 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 60px;
+            font-weight: 600;
+            color: white;
+            border: 5px solid #E8F4F8;
+            object-fit: cover;
+        }
+
+        .profile-info {
+            flex: 1;
+        }
+
+        .profile-name {
+            font-size: 32px;
+            font-weight: 700;
+            color: #2C5F7C;
+            margin-bottom: 8px;
+        }
+
+        .profile-designation {
+            font-size: 18px;
+            color: #666;
+            margin-bottom: 5px;
+        }
+
+        .profile-department {
+            font-size: 16px;
+            color: #888;
+            margin-bottom: 15px;
+        }
+
+        .profile-actions {
+            display: flex;
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #2C5F7C 0%, #3B7A9E 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(44, 95, 124, 0.35);
+        }
+
+        .btn-secondary {
+            background: #f0f0f0;
+            color: #333;
+        }
+
+        .btn-secondary:hover {
+            background: #e0e0e0;
+        }
+
+        .section {
+            margin-bottom: 30px;
+        }
+
+        .section-title {
+            font-size: 20px;
+            font-weight: 600;
+            color: #2C5F7C;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #E8F4F8;
+        }
+
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 20px;
+        }
+
+        .info-item {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .info-label {
+            font-size: 14px;
+            font-weight: 600;
+            color: #888;
+            text-transform: uppercase;
+        }
+
+        .info-value {
+            font-size: 16px;
+            color: #333;
+        }
+
+        .badge-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .badge {
+            background: #E8F4F8;
+            color: #2C5F7C;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        .publications-list {
+            list-style: none;
+            padding: 0;
+        }
+
+        .publication-item {
+            padding: 15px;
+            background: #f9f9f9;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            border-left: 4px solid #2C5F7C;
+        }
+
+        .publication-title {
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 5px;
+        }
+
+        .publication-details {
+            font-size: 14px;
+            color: #666;
+        }
+
+        /* Edit Mode Styles */
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-label {
+            display: block;
+            font-size: 14px;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 8px;
+        }
+
+        .form-input,
+        .form-textarea,
+        .form-select {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.2s;
+        }
+
+        .form-input:focus,
+        .form-textarea:focus,
+        .form-select:focus {
+            outline: none;
+            border-color: #2C5F7C;
+        }
+
+        .form-textarea {
+            min-height: 120px;
+            resize: vertical;
+        }
+
+        .file-upload {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .file-input {
+            display: none;
+        }
+
+        .file-label {
+            background: #f0f0f0;
+            color: #333;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        .file-label:hover {
+            background: #e0e0e0;
+        }
+
+        .file-name {
+            font-size: 14px;
+            color: #666;
+        }
+
+        .toggle-switch {
+            position: relative;
+            display: inline-block;
+            width: 60px;
+            height: 30px;
+        }
+
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .toggle-slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            transition: .4s;
+            border-radius: 30px;
+        }
+
+        .toggle-slider:before {
+            position: absolute;
+            content: "";
+            height: 22px;
+            width: 22px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+
+        input:checked+.toggle-slider {
+            background-color: #2C5F7C;
+        }
+
+        input:checked+.toggle-slider:before {
+            transform: translateX(30px);
+        }
+
+        .dynamic-list {
+            margin-top: 10px;
+        }
+
+        .dynamic-item {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+
+        .dynamic-item input {
+            flex: 1;
+        }
+
+        .btn-remove {
+            background: #dc3545;
+            color: white;
+            padding: 10px 15px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+
+        .btn-add {
+            background: #28a745;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+
+        @media (max-width: 768px) {
+            .profile-header {
+                flex-direction: column;
+                align-items: center;
+                text-align: center;
+            }
+
+            .info-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .profile-actions {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="header">
+        <h1>Teacher Profile</h1>
+        <a href="/dashboard" class="back-btn">← Back to Dashboard</a>
+    </div>
+
+    <div class="container">
+        <div class="profile-card">
+            <!-- View Mode -->
+            <div id="view-mode">
+                <div class="profile-header">
+                    <div class="profile-picture-section">
+                        {% if profile.profile_picture_url %}
+                        <img src="{{ profile.profile_picture_url }}" alt="Profile Picture" class="profile-picture">
+                        {% else %}
+                        <div class="profile-picture">
+                            {{ (profile.full_name or profile.username)[0].upper() }}
+                        </div>
+                        {% endif %}
+                    </div>
+                    <div class="profile-info">
+                        <h1 class="profile-name">{{ profile.full_name or profile.username }}</h1>
+                        <p class="profile-designation">{{ profile.designation or 'Teacher' }}</p>
+                        <p class="profile-department">{{ profile.department or 'Department not specified' }}</p>
+                        {% if profile.email %}
+                        <p class="info-value">📧 {{ profile.email }}</p>
+                        {% endif %}
+                        {% if profile.phone %}
+                        <p class="info-value">📱 {{ profile.phone }}</p>
+                        {% endif %}
+                        <div class="profile-actions">
+                            <button class="btn btn-primary" onclick="toggleEditMode()">✏️ Edit Profile</button>
+                            <label class="info-label" style="display: flex; align-items: center; gap: 10px;">
+                                Profile Visibility:
+                                <label class="toggle-switch">
+                                    <input type="checkbox" id="visibility-toggle-view" {% if profile.profile_visible
+                                        %}checked{% endif %} onchange="toggleVisibility(this.checked)">
+                                    <span class="toggle-slider"></span>
+                                </label>
+                                <span id="visibility-status">{{ 'Visible' if profile.profile_visible else 'Hidden'
+                                    }}</span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Professional Information -->
+                <div class="section">
+                    <h2 class="section-title">Professional Information</h2>
+                    <div class="info-grid">
+                        <div class="info-item">
+                            <span class="info-label">Employee ID</span>
+                            <span class="info-value">{{ profile.employee_id or 'Not specified' }}</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">Qualification</span>
+                            <span class="info-value">{{ profile.qualification or 'Not specified' }}</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Education -->
+                {% if profile.education %}
+                <div class="section">
+                    <h2 class="section-title">Education</h2>
+                    <p class="info-value">{{ profile.education }}</p>
+                </div>
+                {% endif %}
+
+                <!-- Subjects Taught -->
+                {% if profile.subjects_taught %}
+                <div class="section">
+                    <h2 class="section-title">Subjects Taught</h2>
+                    <div class="badge-container">
+                        {% for subject in profile.subjects_taught.split(',') %}
+                        <span class="badge">{{ subject.strip() }}</span>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- Research Areas -->
+                {% if profile.research_areas %}
+                <div class="section">
+                    <h2 class="section-title">Research Areas</h2>
+                    <div class="badge-container">
+                        {% for area in profile.research_areas.split(',') %}
+                        <span class="badge">{{ area.strip() }}</span>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- Biography -->
+                {% if profile.bio %}
+                <div class="section">
+                    <h2 class="section-title">Biography</h2>
+                    <p class="info-value">{{ profile.bio }}</p>
+                </div>
+                {% endif %}
+
+                <!-- Publications -->
+                {% if profile.publications %}
+                <div class="section">
+                    <h2 class="section-title">Publications</h2>
+                    <ul class="publications-list">
+                        {% for pub in profile.publications.split('|||') %}
+                        <li class="publication-item">
+                            <div class="publication-title">📄 {{ pub.strip() }}</div>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                {% endif %}
+
+                <!-- Links -->
+                <div class="section">
+                    <h2 class="section-title">Professional Links</h2>
+                    <div class="info-grid">
+                        {% if profile.linkedin_url %}
+                        <div class="info-item">
+                            <span class="info-label">LinkedIn</span>
+                            <a href="{{ profile.linkedin_url }}" target="_blank" class="info-value">View Profile →</a>
+                        </div>
+                        {% endif %}
+                        {% if profile.google_scholar_url %}
+                        <div class="info-item">
+                            <span class="info-label">Google Scholar</span>
+                            <a href="{{ profile.google_scholar_url }}" target="_blank" class="info-value">View Profile
+                                →</a>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Edit Mode (Hidden by default) -->
+            <div id="edit-mode" style="display: none;">
+                <form id="profile-form" enctype="multipart/form-data">
+                    <div class="section">
+                        <h2 class="section-title">Profile Picture</h2>
+                        <div class="file-upload">
+                            <label for="profile-picture-input" class="file-label">Choose Photo</label>
+                            <input type="file" id="profile-picture-input" class="file-input" accept="image/*"
+                                onchange="displayFileName(this, 'photo-name')">
+                            <span id="photo-name" class="file-name">No file chosen</span>
+                        </div>
+                        <p style="font-size: 12px; color: #888; margin-top: 5px;">Max size: 5MB. Formats: JPG, PNG, WebP
+                        </p>
+                    </div>
+
+                    <div class="section">
+                        <h2 class="section-title">Basic Information</h2>
+                        <div class="info-grid">
+                            <div class="form-group">
+                                <label class="form-label">Full Name</label>
+                                <input type="text" name="full_name" class="form-input"
+                                    value="{{ profile.full_name or '' }}" required>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Employee ID</label>
+                                <input type="text" name="employee_id" class="form-input"
+                                    value="{{ profile.employee_id or '' }}">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Email</label>
+                                <input type="email" name="email" class="form-input" value="{{ profile.email or '' }}">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Phone</label>
+                                <input type="tel" name="phone" class="form-input" value="{{ profile.phone or '' }}">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Department</label>
+                                <input type="text" name="department" class="form-input"
+                                    value="{{ profile.department or '' }}">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Designation</label>
+                                <input type="text" name="designation" class="form-input"
+                                    value="{{ profile.designation or '' }}">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="section">
+                        <h2 class="section-title">Academic Information</h2>
+                        <div class="form-group">
+                            <label class="form-label">Highest Qualification</label>
+                            <input type="text" name="qualification" class="form-input"
+                                value="{{ profile.qualification or '' }}" placeholder="e.g., Ph.D. in Computer Science">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Education History</label>
+                            <textarea name="education" class="form-textarea"
+                                placeholder="List your educational background">{{ profile.education or '' }}</textarea>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Subjects Taught (comma-separated)</label>
+                            <input type="text" name="subjects_taught" class="form-input"
+                                value="{{ profile.subjects_taught or '' }}"
+                                placeholder="e.g., Data Structures, Algorithms, Database">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Research Areas (comma-separated)</label>
+                            <input type="text" name="research_areas" class="form-input"
+                                value="{{ profile.research_areas or '' }}"
+                                placeholder="e.g., Machine Learning, AI, Data Science">
+                        </div>
+                    </div>
+
+                    <div class="section">
+                        <h2 class="section-title">Biography</h2>
+                        <div class="form-group">
+                            <textarea name="bio" class="form-textarea"
+                                placeholder="Write a brief biography about yourself">{{ profile.bio or '' }}</textarea>
+                        </div>
+                    </div>
+
+                    <div class="section">
+                        <h2 class="section-title">Publications</h2>
+                        <div class="form-group">
+                            <label class="form-label">Publications (one per line)</label>
+                            <textarea name="publications" class="form-textarea"
+                                placeholder="Enter your publications, one per line">{{ profile.publications.replace('|||', '\n') if profile.publications else '' }}</textarea>
+                        </div>
+                    </div>
+
+                    <div class="section">
+                        <h2 class="section-title">Professional Links</h2>
+                        <div class="form-group">
+                            <label class="form-label">LinkedIn URL</label>
+                            <input type="url" name="linkedin_url" class="form-input"
+                                value="{{ profile.linkedin_url or '' }}"
+                                placeholder="https://linkedin.com/in/yourprofile">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Google Scholar URL</label>
+                            <input type="url" name="google_scholar_url" class="form-input"
+                                value="{{ profile.google_scholar_url or '' }}"
+                                placeholder="https://scholar.google.com/citations?user=...">
+                        </div>
+                    </div>
+
+                    <div class="profile-actions">
+                        <button type="submit" class="btn btn-primary">💾 Save Changes</button>
+                        <button type="button" class="btn btn-secondary" onclick="toggleEditMode()">✖ Cancel</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function toggleEditMode() {
+            const viewMode = document.getElementById('view-mode');
+            const editMode = document.getElementById('edit-mode');
+
+            if (viewMode.style.display === 'none') {
+                viewMode.style.display = 'block';
+                editMode.style.display = 'none';
+            } else {
+                viewMode.style.display = 'none';
+                editMode.style.display = 'block';
+            }
+        }
+
+        function displayFileName(input, spanId) {
+            const span = document.getElementById(spanId);
+            if (input.files && input.files[0]) {
+                span.textContent = input.files[0].name;
+            } else {
+                span.textContent = 'No file chosen';
+            }
+        }
+
+        async function toggleVisibility(isVisible) {
+            try {
+                const response = await fetch('/api/teacher/profile/visibility', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ visible: isVisible })
+                });
+
+                if (response.ok) {
+                    document.getElementById('visibility-status').textContent = isVisible ? 'Visible' : 'Hidden';
+                } else {
+                    alert('Failed to update visibility');
+                    document.getElementById('visibility-toggle-view').checked = !isVisible;
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Failed to update visibility');
+                document.getElementById('visibility-toggle-view').checked = !isVisible;
+            }
+        }
+
+        document.getElementById('profile-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const formData = new FormData(e.target);
+
+            // Handle profile picture upload separately if selected
+            const photoInput = document.getElementById('profile-picture-input');
+            if (photoInput.files && photoInput.files[0]) {
+                const photoFormData = new FormData();
+                photoFormData.append('file', photoInput.files[0]);
+
+                try {
+                    const photoResponse = await fetch('/api/teacher/profile/upload-photo', {
+                        method: 'POST',
+                        body: photoFormData
+                    });
+
+                    if (!photoResponse.ok) {
+                        alert('Failed to upload profile picture');
+                        return;
+                    }
+                } catch (error) {
+                    console.error('Error uploading photo:', error);
+                    alert('Failed to upload profile picture');
+                    return;
+                }
+            }
+
+            // Convert publications from newlines to |||
+            const publications = formData.get('publications');
+            if (publications) {
+                formData.set('publications', publications.split('\n').filter(p => p.trim()).join('|||'));
+            }
+
+            // Update profile
+            try {
+                const response = await fetch('/api/teacher/profile/update', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (response.ok) {
+                    alert('Profile updated successfully!');
+                    window.location.reload();
+                } else {
+                    alert('Failed to update profile');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Failed to update profile');
+            }
+        });
+    </script>
+</body>
+
+</html>

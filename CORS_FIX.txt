@@ -1,0 +1,23 @@
+# Quick fix for CORS cookie issue
+# Add this to your backend/main.py after the CORS middleware
+
+# Update the CORS middleware to allow credentials properly
+from fastapi.middleware.cors import CORSMiddleware
+
+# The CORS middleware should look like this:
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+    allow_credentials=True,  # This is crucial!
+    allow_methods=["*"],
+    allow_headers=["*"],
+    expose_headers=["*"],  # Add this
+)
+
+# For the login endpoint, change samesite from "lax" to "none"
+# Find this line in the login function:
+#   samesite="lax",
+# Change it to:
+#   samesite="none",
+
+# This allows cookies to work across different origins (localhost:5173 -> localhost:8000)
