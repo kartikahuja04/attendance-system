@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Request, Form, HTTPException, Depends, Cookie, UploadFile, File
+from fastapi import FastAPI, Request, Form, HTTPException, Depends, Cookie, UploadFile, File, Header
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -49,14 +49,22 @@ app.mount("/uploads", StaticFiles(directory=UPLOADS_DIR), name="uploads")
 templates = Jinja2Templates(directory=TEMPLATES_DIR)
 
 # Simple session management (in production, use proper JWT tokens)
-def get_current_teacher(session_token: Optional[str] = Cookie(None)):
-    if not session_token:
+async def get_current_teacher(
+    session_token: Optional[str] = Cookie(None),
+    x_auth_token: Optional[str] = Header(None, alias="X-Auth-Token")
+):
+    # Try cookie first, then header
+    token = session_token or x_auth_token
+    if not token:
         return None
     try:
-        cursor.execute("SELECT id, username FROM teachers WHERE id=?", (session_token,))
+        # Use a local cursor for thread safety if necessary, but in async def 
+        # it runs in the main loop sequentially.
+        cursor.execute("SELECT id, username FROM teachers WHERE id=?", (token,))
         teacher = cursor.fetchone()
         return {"id": teacher[0], "username": teacher[1]} if teacher else None
-    except:
+    except Exception as e:
+        print(f"Auth error: {e}")
         return None
 
 # Helper to normalize datetime values for JSON responses
@@ -109,14 +117,15 @@ async def login(username: str = Form(...), password: str = Form(...)):
             "message": "Login successful",
             "user": {"id": teacher[0], "username": teacher[1]}
         })
-        # Set cookie for authentication
+        # Set cookie for authentication - use SameSite=None for proxy compatibility
         response.set_cookie(
             key="session_token",
             value=str(teacher[0]),
             httponly=False,  # Allow JavaScript to read cookie
-            samesite="lax",  # Works on localhost
-            secure=False,  # HTTP is fine for localhost
-            max_age=86400
+            samesite="none",  # Required for cross-port proxy
+            secure=False,  # HTTP for localhost (browsers allow this for localhost)
+            max_age=86400,
+            path="/"
         )
         return response
     else:
@@ -143,37 +152,32 @@ async def get_teacher_schedule(teacher: Optional[dict] = Depends(get_current_tea
         raise HTTPException(status_code=401, detail="Not authenticated")
     
     # Get today's day of week
-    from datetime import datetime
     today = datetime.now().strftime('%A')
     
-    # For demo purposes, return mock schedule based on day
-    # In production, this would query a teacher_schedule table
-    mock_schedules = {
-        'Monday': [
-            {'subject': 'Data Structures', 'subject_code': 'CS201', 'class_name': 'CSE-3A', 'time': '09:00-10:00'},
-            {'subject': 'Database Management', 'subject_code': 'CS301', 'class_name': 'CSE-4A', 'time': '11:00-12:00'},
-            {'subject': 'Web Development', 'subject_code': 'CS401', 'class_name': 'CSE-5A', 'time': '14:00-15:00'}
-        ],
-        'Tuesday': [
-            {'subject': 'Algorithms', 'subject_code': 'CS202', 'class_name': 'CSE-3B', 'time': '10:00-11:00'},
-            {'subject': 'Operating Systems', 'subject_code': 'CS302', 'class_name': 'CSE-4B', 'time': '13:00-14:00'}
-        ],
-        'Wednesday': [
-            {'subject': 'Data Structures', 'subject_code': 'CS201', 'class_name': 'CSE-3A', 'time': '09:00-10:00'},
-            {'subject': 'Database Management', 'subject_code': 'CS301', 'class_name': 'CSE-4A', 'time': '11:00-12:00'}
-        ],
-        'Thursday': [
-            {'subject': 'Web Development', 'subject_code': 'CS401', 'class_name': 'CSE-5A', 'time': '10:00-11:00'},
-            {'subject': 'Algorithms', 'subject_code': 'CS202', 'class_name': 'CSE-3B', 'time': '14:00-15:00'}
-        ],
-        'Friday': [
-            {'subject': 'Operating Systems', 'subject_code': 'CS302', 'class_name': 'CSE-4B', 'time': '09:00-10:00'},
-            {'subject': 'Data Structures', 'subject_code': 'CS201', 'class_name': 'CSE-3A', 'time': '11:00-12:00'}
-        ]
-    }
+    # Query real schedule from database
+    cursor.execute("""
+        SELECT subject, subject_code, class_name, section, 
+               start_time || '-' || end_time as time, room
+        FROM schedules
+        WHERE teacher_id=? AND day_of_week=?
+        ORDER BY start_time
+    """, (teacher["id"], today))
     
-    schedule = mock_schedules.get(today, [])
+    rows = cursor.fetchall()
+    schedule = [
+        {
+            'subject': r[0],
+            'subject_code': r[1] or f"{r[2]}-{r[3]}",
+            'class_name': r[2],
+            'section': r[3],
+            'time': r[4],
+            'room': r[5]
+        }
+        for r in rows
+    ]
+    
     return JSONResponse({"schedule": schedule, "day": today})
+
 
 # Get previous day statistics
 @app.get("/api/teacher/previous-day-stats")
@@ -182,7 +186,6 @@ async def get_previous_day_stats(teacher: Optional[dict] = Depends(get_current_t
         raise HTTPException(status_code=401, detail="Not authenticated")
     
     # Get yesterday's date
-    from datetime import datetime, timedelta
     yesterday = (datetime.now() - timedelta(days=1)).strftime('%Y-%m-%d')
     
     # Query sessions from yesterday
@@ -206,12 +209,20 @@ async def get_previous_day_stats(teacher: Optional[dict] = Depends(get_current_t
             FROM attendance
             WHERE session_id=?
         """, (session_id,))
-        
         present_count = cursor.fetchone()[0] or 0
         
-        # Mock total students (in production, this would come from a class roster table)
-        total_students = 45 if 'CS201' in session_id else (48 if 'CS301' in session_id else 40)
-        absent_students = total_students - present_count
+        # Get total students from class_rosters table
+        cursor.execute("""
+            SELECT COUNT(*) FROM class_rosters
+            WHERE class_name=? AND section=?
+        """, (class_name, section))
+        total_students = cursor.fetchone()[0] or 0
+        
+        # If no roster exists, estimate from attendance
+        if total_students == 0:
+            total_students = max(present_count, 30)  # Minimum 30 students
+        
+        absent_students = max(0, total_students - present_count)
         
         stats.append({
             'subject': subject,
@@ -221,18 +232,288 @@ async def get_previous_day_stats(teacher: Optional[dict] = Depends(get_current_t
             'absent_students': absent_students
         })
     
-    # If no sessions yesterday, return mock data
-    if not stats:
-        stats = [
-            {'subject': 'Data Structures', 'subject_code': 'CS201', 'total_students': 45, 'present_students': 42, 'absent_students': 3},
-            {'subject': 'Database Management', 'subject_code': 'CS301', 'total_students': 48, 'present_students': 46, 'absent_students': 2},
-            {'subject': 'Web Development', 'subject_code': 'CS401', 'total_students': 40, 'present_students': 38, 'absent_students': 2}
-        ]
-    
     return JSONResponse({"stats": stats, "date": yesterday})
 
 
+# ==================== ANNOUNCEMENTS ====================
+
+# Get announcements
+@app.get("/api/announcements")
+async def get_announcements(teacher: Optional[dict] = Depends(get_current_teacher)):
+    if not teacher:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    
+    cursor.execute("""
+        SELECT id, title, content, priority, created_at
+        FROM announcements
+        WHERE expires_at IS NULL OR expires_at > datetime('now')
+        ORDER BY priority DESC, created_at DESC
+        LIMIT 10
+    """)
+    rows = cursor.fetchall()
+    return JSONResponse({"announcements": [
+        {"id": r[0], "title": r[1], "content": r[2], 
+         "priority": r[3], "date": _ts_str(r[4])}
+        for r in rows
+    ]})
+
+# Create announcement
+@app.post("/api/announcements")
+async def create_announcement(
+    content: str = Form(...),
+    title: str = Form(None),
+    priority: str = Form("normal"),
+    teacher: Optional[dict] = Depends(get_current_teacher)
+):
+    if not teacher:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    
+    cursor.execute("""
+        INSERT INTO announcements (title, content, priority, created_by)
+        VALUES (?, ?, ?, ?)
+    """, (title, content, priority, teacher["id"]))
+    conn.commit()
+    return JSONResponse({"success": True, "message": "Announcement created"})
+
+# Delete announcement
+@app.delete("/api/announcements/{announcement_id}")
+async def delete_announcement(
+    announcement_id: int,
+    teacher: Optional[dict] = Depends(get_current_teacher)
+):
+    if not teacher:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    
+    cursor.execute("DELETE FROM announcements WHERE id=?", (announcement_id,))
+    conn.commit()
+    return JSONResponse({"success": True})
+
+
+# ==================== TEACHER STATS ====================
+
+# Get dashboard statistics
+@app.get("/api/teacher/stats")
+async def get_teacher_stats(teacher: Optional[dict] = Depends(get_current_teacher)):
+    if not teacher:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    
+    # Total sessions
+    cursor.execute("SELECT COUNT(*) FROM sessions WHERE teacher_id=?", (teacher["id"],))
+    total_sessions = cursor.fetchone()[0] or 0
+    
+    # Active sessions
+    cursor.execute("SELECT COUNT(*) FROM sessions WHERE teacher_id=? AND status='active'", (teacher["id"],))
+    active_sessions = cursor.fetchone()[0] or 0
+    
+    # Today's classes count
+    today = datetime.now().strftime('%A')
+    cursor.execute("SELECT COUNT(*) FROM schedules WHERE teacher_id=? AND day_of_week=?", (teacher["id"], today))
+    todays_classes = cursor.fetchone()[0] or 0
+    
+    # Average attendance (last 7 days)
+    cursor.execute("""
+        SELECT s.session_id, s.class_name, s.section
+        FROM sessions s
+        WHERE s.teacher_id = ? AND s.status = 'ended'
+        AND s.start_time > datetime('now', '-7 days')
+    """, (teacher["id"],))
+    recent_sessions = cursor.fetchall()
+    
+    attendance_rates = []
+    for session_id, class_name, section in recent_sessions:
+        cursor.execute("SELECT COUNT(DISTINCT student_id) FROM attendance WHERE session_id=?", (session_id,))
+        present = cursor.fetchone()[0] or 0
+        
+        cursor.execute("SELECT COUNT(*) FROM class_rosters WHERE class_name=? AND section=?", (class_name, section))
+        total = cursor.fetchone()[0] or 0
+        
+        if total > 0:
+            attendance_rates.append((present / total) * 100)
+        elif present > 0:
+            attendance_rates.append(100)  # All present students counted as 100%
+    
+    avg_attendance = round(sum(attendance_rates) / len(attendance_rates), 1) if attendance_rates else 0
+    
+    return JSONResponse({
+        "total_sessions": total_sessions,
+        "active_sessions": active_sessions,
+        "avg_attendance": avg_attendance,
+        "todays_classes": todays_classes
+    })
+
+
+# ==================== SCHEDULES CRUD ====================
+
+# Get all schedules for a teacher
+@app.get("/api/schedules")
+async def get_all_schedules(teacher: Optional[dict] = Depends(get_current_teacher)):
+    if not teacher:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    
+    cursor.execute("""
+        SELECT id, day_of_week, subject, subject_code, class_name, section, 
+               start_time, end_time, room
+        FROM schedules
+        WHERE teacher_id=?
+        ORDER BY 
+            CASE day_of_week 
+                WHEN 'Monday' THEN 1 WHEN 'Tuesday' THEN 2 WHEN 'Wednesday' THEN 3 
+                WHEN 'Thursday' THEN 4 WHEN 'Friday' THEN 5 WHEN 'Saturday' THEN 6 
+                ELSE 7 END,
+            start_time
+    """, (teacher["id"],))
+    
+    rows = cursor.fetchall()
+    return JSONResponse({"schedules": [
+        {
+            "id": r[0], "day_of_week": r[1], "subject": r[2], "subject_code": r[3],
+            "class_name": r[4], "section": r[5], "start_time": r[6], "end_time": r[7], "room": r[8]
+        }
+        for r in rows
+    ]})
+
+# Create schedule entry
+@app.post("/api/schedules")
+async def create_schedule(
+    day_of_week: str = Form(...),
+    subject: str = Form(...),
+    subject_code: str = Form(None),
+    class_name: str = Form(...),
+    section: str = Form(...),
+    start_time: str = Form(...),
+    end_time: str = Form(...),
+    room: str = Form(None),
+    teacher: Optional[dict] = Depends(get_current_teacher)
+):
+    if not teacher:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    
+    cursor.execute("""
+        INSERT INTO schedules (teacher_id, day_of_week, subject, subject_code, class_name, section, start_time, end_time, room)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (teacher["id"], day_of_week, subject, subject_code, class_name, section, start_time, end_time, room))
+    conn.commit()
+    return JSONResponse({"success": True, "id": cursor.lastrowid})
+
+# Delete schedule entry
+@app.delete("/api/schedules/{schedule_id}")
+async def delete_schedule(
+    schedule_id: int,
+    teacher: Optional[dict] = Depends(get_current_teacher)
+):
+    if not teacher:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    
+    cursor.execute("DELETE FROM schedules WHERE id=? AND teacher_id=?", (schedule_id, teacher["id"]))
+    conn.commit()
+    return JSONResponse({"success": True})
+
+
+# ==================== CLASS ROSTERS ====================
+
+# Get unique classes from sessions
+@app.get("/api/classes")
+async def get_classes(teacher: Optional[dict] = Depends(get_current_teacher)):
+    if not teacher:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    
+    cursor.execute("""
+        SELECT DISTINCT class_name, section FROM sessions WHERE teacher_id=?
+        UNION
+        SELECT DISTINCT class_name, section FROM schedules WHERE teacher_id=?
+        ORDER BY class_name, section
+    """, (teacher["id"], teacher["id"]))
+    
+    return JSONResponse({"classes": [
+        {"class_name": r[0], "section": r[1]} for r in cursor.fetchall()
+    ]})
+
+# Get students in a class
+@app.get("/api/classes/{class_name}/{section}/students")
+async def get_class_students(class_name: str, section: str, teacher: Optional[dict] = Depends(get_current_teacher)):
+    if not teacher:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    
+    cursor.execute("""
+        SELECT id, student_id, student_name FROM class_rosters
+        WHERE class_name=? AND section=?
+        ORDER BY student_id
+    """, (class_name, section))
+    
+    return JSONResponse({"students": [
+        {"id": r[0], "student_id": r[1], "student_name": r[2]} for r in cursor.fetchall()
+    ]})
+
+# Add student to roster
+@app.post("/api/classes/{class_name}/{section}/students")
+async def add_student_to_roster(
+    class_name: str, 
+    section: str,
+    student_id: str = Form(...),
+    student_name: str = Form(None),
+    teacher: Optional[dict] = Depends(get_current_teacher)
+):
+    if not teacher:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    
+    try:
+        cursor.execute("""
+            INSERT INTO class_rosters (class_name, section, student_id, student_name)
+            VALUES (?, ?, ?, ?)
+        """, (class_name, section, student_id, student_name))
+        conn.commit()
+        return JSONResponse({"success": True, "id": cursor.lastrowid})
+    except Exception as e:
+        raise HTTPException(status_code=400, detail="Student already exists in roster")
+
+# Remove student from roster
+@app.delete("/api/classes/{class_name}/{section}/students/{student_id}")
+async def remove_student_from_roster(
+    class_name: str,
+    section: str,
+    student_id: str,
+    teacher: Optional[dict] = Depends(get_current_teacher)
+):
+    if not teacher:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    
+    cursor.execute("DELETE FROM class_rosters WHERE class_name=? AND section=? AND student_id=?", 
+                   (class_name, section, student_id))
+    conn.commit()
+    return JSONResponse({"success": True})
+
+# Bulk import students to roster
+@app.post("/api/classes/{class_name}/{section}/students/bulk")
+async def bulk_import_students(
+    class_name: str,
+    section: str,
+    request: Request,
+    teacher: Optional[dict] = Depends(get_current_teacher)
+):
+    if not teacher:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    
+    data = await request.json()
+    students = data.get("students", [])
+    imported = 0
+    
+    for student in students:
+        try:
+            cursor.execute("""
+                INSERT OR IGNORE INTO class_rosters (class_name, section, student_id, student_name)
+                VALUES (?, ?, ?, ?)
+            """, (class_name, section, student.get("student_id"), student.get("student_name")))
+            if cursor.rowcount > 0:
+                imported += 1
+        except:
+            pass
+    
+    conn.commit()
+    return JSONResponse({"success": True, "imported": imported, "total": len(students)})
+
+
 # ==================== TEACHER PROFILE & DIRECTORY ====================
+
 
 # Teacher Profile Page
 @app.get("/teacher/profile", response_class=HTMLResponse)
@@ -551,12 +832,14 @@ async def get_active_sessions(teacher: Optional[dict] = Depends(get_current_teac
     return JSONResponse({
         "sessions": [
             {
-                "id": s[0],  # Changed from session_id
+                "id": s[0],              # React expectations
+                "session_id": s[0],      # Jinja2 expectations
                 "class_name": s[1],
                 "subject": s[2],
-                "subject_code": s[2],  # Use subject as subject_code
+                "subject_code": s[2],
                 "section": s[3],
-                "date": _ts_str(s[4]),  # Changed from start_time
+                "date": _ts_str(s[4]),    # React expectations
+                "start_time": _ts_str(s[4]), # Jinja2 expectations
                 "status": s[5]
             }
             for s in sessions
@@ -565,26 +848,36 @@ async def get_active_sessions(teacher: Optional[dict] = Depends(get_current_teac
 
 # Get all sessions for teacher
 @app.get("/api/sessions")
-async def get_all_sessions(teacher: Optional[dict] = Depends(get_current_teacher)):
+async def get_all_sessions(
+    date: Optional[str] = None,
+    teacher: Optional[dict] = Depends(get_current_teacher)
+):
     if not teacher:
         raise HTTPException(status_code=401, detail="Not authenticated")
     
-    cursor.execute("""
-        SELECT session_id, class_name, subject, section, start_time, end_time, status
-        FROM sessions
-        WHERE teacher_id=?
-        ORDER BY start_time DESC
-    """, (teacher["id"],))
+    query = "SELECT session_id, class_name, subject, section, start_time, end_time, status FROM sessions WHERE teacher_id=?"
+    params = [teacher["id"]]
     
+    if date:
+        # Match YYYY-MM-DD
+        query += " AND start_time LIKE ?"
+        params.append(f"{date}%")
+    
+    query += " ORDER BY start_time DESC"
+    
+    cursor.execute(query, params)
     sessions = cursor.fetchall()
+    
     return JSONResponse({
         "sessions": [
             {
-                "session_id": s[0],
+                "id": s[0],              # For React
+                "session_id": s[0],      # For Jinja2
                 "class_name": s[1],
                 "subject": s[2],
                 "section": s[3],
-                "start_time": _ts_str(s[4]),
+                "date": _ts_str(s[4]),    # For React
+                "start_time": _ts_str(s[4]), # For Jinja2
                 "end_time": _ts_str(s[5]) if s[5] is not None else None,
                 "status": s[6]
             }
@@ -603,6 +896,10 @@ async def create_session(
 ):
     if not teacher:
         raise HTTPException(status_code=401, detail="Not authenticated")
+    
+    # Normalize start_time (replace 'T' from datetime-local with space)
+    if start_time and 'T' in start_time:
+        start_time = start_time.replace('T', ' ')
     
     # Generate unique session ID
     session_id = f"{class_name}-{subject}-{section}-{datetime.now().strftime('%Y%m%d%H%M%S')}"
@@ -841,7 +1138,7 @@ async def mark_attendance_manual(
 
 # Live attendance JSON API
 @app.get("/api/attendance/{session_id}")
-def api_attendance(session_id: str):
+async def api_attendance(session_id: str):
     cursor.execute(
         """
         SELECT student_id, timestamp, marked_by
@@ -864,6 +1161,35 @@ def api_attendance(session_id: str):
         "total": len(norm),
         "records": norm
     })
+
+# Student attendance history API (for QuickMark mobile app)
+@app.get("/api/attendance/history/{student_id}")
+async def get_student_attendance_history(student_id: str):
+    """Get attendance history for a specific student."""
+    cursor.execute("""
+        SELECT a.session_id, a.timestamp, a.marked_by,
+               s.class_name, s.subject, s.section
+        FROM attendance a
+        LEFT JOIN sessions s ON a.session_id = s.session_id
+        WHERE a.student_id = ?
+        ORDER BY a.timestamp DESC
+        LIMIT 100
+    """, (student_id,))
+    
+    rows = cursor.fetchall()
+    records = []
+    for row in rows:
+        records.append({
+            "session_id": row[0],
+            "timestamp": _ts_str(row[1]),
+            "marked_by": row[2],
+            "class_name": row[3],
+            "subject": row[4],
+            "section": row[5],
+            "status": "Present"
+        })
+    
+    return JSONResponse({"records": records})
 
 # View Attendance page
 @app.get("/view-attendance", response_class=HTMLResponse)
@@ -911,6 +1237,14 @@ async def get_attendance_data(session_id: str, teacher: Optional[dict] = Depends
     """, (session_id,))
     total_present = cursor.fetchone()[0]
     
+    # Calculate absent count using class_roster
+    cursor.execute("""
+        SELECT COUNT(*) FROM class_rosters 
+        WHERE class_name=? AND section=?
+    """, (session[0], session[2]))
+    total_roster = cursor.fetchone()[0]
+    total_absent = max(0, total_roster - total_present)
+    
     return JSONResponse({
         "session": {
             "session_id": session_id,
@@ -926,7 +1260,7 @@ async def get_attendance_data(session_id: str, teacher: Optional[dict] = Depends
             for a in attendance_list
         ],
         "total_present": total_present,
-        "total_absent": 0  # You can calculate this if you have a student list
+        "total_absent": total_absent
     })
 
 # Export attendance to Excel

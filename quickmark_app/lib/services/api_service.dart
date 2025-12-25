@@ -77,7 +77,7 @@ class ApiService {
   /// Get attendance history for a student
   Future<List<AttendanceRecord>> getAttendanceHistory(String studentId) async {
     try {
-      final url = Uri.parse('${AppConstants.attendanceHistoryUrl}/history/$studentId');
+      final url = Uri.parse('${AppConstants.apiBaseUrl}/api/attendance/history/$studentId');
       final response = await http.get(url).timeout(_timeout);
 
       if (response.statusCode == 200) {

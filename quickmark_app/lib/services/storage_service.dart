@@ -88,4 +88,42 @@ class StorageService {
     await init();
     return _prefs!.getString(key);
   }
+
+  // ==================== Face Enrollment Methods ====================
+  
+  static const String _keyFaceEmbedding = 'face_embedding';
+  
+  /// Check if face is enrolled
+  Future<bool> hasFaceEnrolled() async {
+    await init();
+    final embedding = _prefs!.getString(_keyFaceEmbedding);
+    return embedding != null && embedding.isNotEmpty;
+  }
+  
+  /// Save face embedding (as comma-separated string)
+  Future<bool> saveFaceEmbedding(List<double> embedding) async {
+    await init();
+    final embeddingString = embedding.map((e) => e.toString()).join(',');
+    return await _prefs!.setString(_keyFaceEmbedding, embeddingString);
+  }
+  
+  /// Get stored face embedding
+  Future<List<double>?> getFaceEmbedding() async {
+    await init();
+    final embeddingString = _prefs!.getString(_keyFaceEmbedding);
+    if (embeddingString == null || embeddingString.isEmpty) {
+      return null;
+    }
+    try {
+      return embeddingString.split(',').map((e) => double.parse(e)).toList();
+    } catch (e) {
+      return null;
+    }
+  }
+  
+  /// Clear face enrollment
+  Future<bool> clearFaceEnrollment() async {
+    await init();
+    return await _prefs!.remove(_keyFaceEmbedding);
+  }
 }

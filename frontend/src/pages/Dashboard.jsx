@@ -1,14 +1,21 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { getSchedule, getPreviousDayStats } from '../services/api';
+import { getSchedule, getPreviousDayStats, getAnnouncements, getStats } from '../services/api';
 import Layout from '../components/Layout';
 
 export default function Dashboard() {
     const { user } = useAuth();
     const navigate = useNavigate();
     const [schedule, setSchedule] = useState([]);
-    const [stats, setStats] = useState([]);
+    const [prevDayStats, setPrevDayStats] = useState([]);
+    const [announcements, setAnnouncements] = useState([]);
+    const [dashboardStats, setDashboardStats] = useState({
+        total_sessions: 0,
+        active_sessions: 0,
+        avg_attendance: 0,
+        todays_classes: 0
+    });
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
@@ -19,12 +26,21 @@ export default function Dashboard() {
 
         const fetchData = async () => {
             try {
-                const [scheduleRes, statsRes] = await Promise.all([
+                const [scheduleRes, prevStatsRes, announcementsRes, statsRes] = await Promise.all([
                     getSchedule(),
                     getPreviousDayStats(),
+                    getAnnouncements().catch(() => ({ data: { announcements: [] } })),
+                    getStats().catch(() => ({ data: {} })),
                 ]);
                 setSchedule(scheduleRes.data.schedule || []);
-                setStats(statsRes.data.stats || []);
+                setPrevDayStats(prevStatsRes.data.stats || []);
+                setAnnouncements(announcementsRes.data.announcements || []);
+                setDashboardStats(statsRes.data || {
+                    total_sessions: 0,
+                    active_sessions: 0,
+                    avg_attendance: 0,
+                    todays_classes: 0
+                });
             } catch (error) {
                 console.error('Error fetching data:', error);
             } finally {
@@ -66,6 +82,9 @@ export default function Dashboard() {
                                             <span className="text-text-secondary ml-2">
                                                 {item.class_name} - {item.section}
                                             </span>
+                                            {item.time && (
+                                                <span className="text-text-secondary ml-2">({item.time})</span>
+                                            )}
                                         </div>
                                     ))}
                                 </div>
@@ -82,18 +101,18 @@ export default function Dashboard() {
                     </div>
                 </div>
 
-                {/* Stats Grid */}
+                {/* Stats Grid - Dynamic from API */}
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
                     <div className="stat-card">
-                        <div className="stat-value">12</div>
+                        <div className="stat-value">{dashboardStats.total_sessions || 0}</div>
                         <div className="stat-label">Total Sessions</div>
                     </div>
                     <div className="stat-card">
-                        <div className="stat-value">3</div>
+                        <div className="stat-value">{dashboardStats.active_sessions || 0}</div>
                         <div className="stat-label">Active Sessions</div>
                     </div>
                     <div className="stat-card">
-                        <div className="stat-value">92%</div>
+                        <div className="stat-value">{dashboardStats.avg_attendance || 0}%</div>
                         <div className="stat-label">Avg Attendance</div>
                     </div>
                     <div className="stat-card">
@@ -103,30 +122,29 @@ export default function Dashboard() {
                 </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    {/* Announcements */}
+                    {/* Announcements - Dynamic from API */}
                     <div className="card">
                         <h3 className="section-header">Announcements</h3>
                         <div className="space-y-3">
-                            <AnnouncementItem
-                                date="Dec 12, 2025"
-                                text="Mid-term examinations will be conducted from December 20-25, 2025."
-                                priority="high"
-                            />
-                            <AnnouncementItem
-                                date="Dec 10, 2025"
-                                text="Faculty meeting scheduled for December 15, 2025 at 3:00 PM in Conference Hall."
-                            />
-                            <AnnouncementItem
-                                date="Dec 8, 2025"
-                                text="Student project submissions deadline: December 18, 2025."
-                            />
+                            {announcements.length > 0 ? (
+                                announcements.map((item) => (
+                                    <AnnouncementItem
+                                        key={item.id}
+                                        date={item.date}
+                                        text={item.content}
+                                        priority={item.priority}
+                                    />
+                                ))
+                            ) : (
+                                <p className="text-text-secondary text-sm">No announcements</p>
+                            )}
                         </div>
                     </div>
 
                     {/* Previous Day Summary */}
                     <div className="card">
                         <h3 className="section-header">Previous Day Summary</h3>
-                        {stats.length > 0 ? (
+                        {prevDayStats.length > 0 ? (
                             <table className="table">
                                 <thead>
                                     <tr>
@@ -137,7 +155,7 @@ export default function Dashboard() {
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {stats.map((stat, idx) => (
+                                    {prevDayStats.map((stat, idx) => (
                                         <tr key={idx}>
                                             <td className="font-medium">{stat.subject}</td>
                                             <td>{stat.total_students}</td>
@@ -148,7 +166,7 @@ export default function Dashboard() {
                                 </tbody>
                             </table>
                         ) : (
-                            <p className="text-text-secondary text-sm">No data from previous day</p>
+                            <p className="text-text-secondary text-sm">No sessions from previous day</p>
                         )}
                     </div>
                 </div>
@@ -172,3 +190,4 @@ function AnnouncementItem({ date, text, priority }) {
         </div>
     );
 }
+

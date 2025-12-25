@@ -8,6 +8,8 @@ import 'package:permission_handler/permission_handler.dart';
 import '../providers/auth_provider.dart';
 import '../providers/attendance_provider.dart';
 import '../services/liveness_service.dart';
+import '../services/face_recognition_service.dart';
+import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
 import '../widgets/camera_overlay.dart';
 import '../utils/constants.dart';
 import 'success_screen.dart';
@@ -26,6 +28,17 @@ class _CameraScreenState extends State<CameraScreen> with WidgetsBindingObserver
   CameraController? _cameraController;
   MobileScannerController? _qrController;
   final LivenessService _livenessService = LivenessService();
+  final FaceRecognitionService _faceRecognitionService = FaceRecognitionService();
+  final FaceDetector _faceDetector = FaceDetector(
+    options: FaceDetectorOptions(
+      enableContours: false,
+      enableClassification: true,
+      enableLandmarks: true,
+      enableTracking: true,
+      performanceMode: FaceDetectorMode.fast,
+    ),
+  );
+  bool _isVerifyingFace = false;
   
   CameraMode _mode = CameraMode.liveness;
   bool _isProcessing = false;
@@ -142,15 +155,14 @@ class _CameraScreenState extends State<CameraScreen> with WidgetsBindingObserver
           _headMoved = result.headMovementDetected;
         });
 
-        if (result.passed) {
-          // Haptic feedback on liveness pass
-          HapticFeedback.mediumImpact();
+        if (result.passed && !_isVerifyingFace) {
+          // Liveness passed - now verify face identity
+          _isVerifyingFace = true;
+          setState(() {
+            _message = 'Verifying your identity...';
+          });
           
-          // Small delay to show success message
-          await Future.delayed(const Duration(milliseconds: 500));
-          
-          // Liveness check passed - switch to QR scanning mode
-          await _switchToQrMode();
+          await _verifyFaceAndProceed(image);
         }
       }
     } catch (e) {
@@ -158,6 +170,88 @@ class _CameraScreenState extends State<CameraScreen> with WidgetsBindingObserver
       debugPrint('Image processing error: $e');
     } finally {
       _isProcessing = false;
+    }
+  }
+
+  /// Verify face matches enrolled face before proceeding
+  Future<void> _verifyFaceAndProceed(CameraImage image) async {
+    try {
+      // Check if face is enrolled
+      final isEnrolled = await _faceRecognitionService.isFaceEnrolled();
+      if (!isEnrolled) {
+        // No face enrolled - proceed with just liveness (fallback)
+        HapticFeedback.mediumImpact();
+        await Future.delayed(const Duration(milliseconds: 300));
+        await _switchToQrMode();
+        return;
+      }
+
+      // Convert camera image to input image for face detection
+      final inputImage = _convertToInputImage(image);
+      if (inputImage == null) {
+        _handleVerificationError('Failed to process image');
+        return;
+      }
+
+      // Detect face
+      final faces = await _faceDetector.processImage(inputImage);
+      if (faces.isEmpty) {
+        _handleVerificationError('No face detected. Please try again.');
+        return;
+      }
+
+      // Verify face
+      final face = faces.first;
+      final result = await _faceRecognitionService.verifyFace(image, face);
+
+      if (result.recognized) {
+        // Face verified - switch to QR mode
+        HapticFeedback.heavyImpact();
+        setState(() {
+          _message = 'Identity verified! Switching to QR scanner...';
+        });
+        await Future.delayed(const Duration(milliseconds: 500));
+        await _switchToQrMode();
+      } else {
+        _showError('Face verification failed: ${result.message}', 'face_mismatch');
+      }
+    } catch (e) {
+      debugPrint('Face verification error: $e');
+      _handleVerificationError('Verification failed: $e');
+    }
+  }
+
+  void _handleVerificationError(String message) {
+    if (mounted) {
+      setState(() {
+        _isVerifyingFace = false;
+        _message = message;
+      });
+      _livenessService.reset();
+    }
+  }
+
+  InputImage? _convertToInputImage(CameraImage image) {
+    try {
+      final WriteBuffer allBytes = WriteBuffer();
+      for (final Plane plane in image.planes) {
+        allBytes.putUint8List(plane.bytes);
+      }
+      final bytes = allBytes.done().buffer.asUint8List();
+
+      final inputImageData = InputImageMetadata(
+        size: Size(image.width.toDouble(), image.height.toDouble()),
+        rotation: InputImageRotation.rotation0deg,
+        format: InputImageFormat.nv21,
+        bytesPerRow: image.planes.first.bytesPerRow,
+      );
+
+      return InputImage.fromBytes(
+        bytes: bytes,
+        metadata: inputImageData,
+      );
+    } catch (e) {
+      return null;
     }
   }
 
@@ -293,6 +387,7 @@ class _CameraScreenState extends State<CameraScreen> with WidgetsBindingObserver
     _cameraController?.dispose();
     _qrController?.dispose();
     _livenessService.dispose();
+    _faceDetector.close();
     super.dispose();
   }
 

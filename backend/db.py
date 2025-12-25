@@ -176,6 +176,49 @@ else:
     except Exception:
         pass
 
+    # Create schedules table for teacher class schedules
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS schedules (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        teacher_id INTEGER NOT NULL,
+        day_of_week TEXT NOT NULL,
+        subject TEXT NOT NULL,
+        subject_code TEXT,
+        class_name TEXT NOT NULL,
+        section TEXT NOT NULL,
+        start_time TEXT NOT NULL,
+        end_time TEXT NOT NULL,
+        room TEXT,
+        FOREIGN KEY (teacher_id) REFERENCES teachers(id)
+    )
+    """)
+
+    # Create announcements table for dashboard
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS announcements (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        title TEXT,
+        content TEXT NOT NULL,
+        priority TEXT DEFAULT 'normal',
+        created_by INTEGER,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        expires_at DATETIME,
+        FOREIGN KEY (created_by) REFERENCES teachers(id)
+    )
+    """)
+
+    # Create class_rosters table for student lists
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS class_rosters (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        class_name TEXT NOT NULL,
+        section TEXT NOT NULL,
+        student_id TEXT NOT NULL,
+        student_name TEXT,
+        UNIQUE(class_name, section, student_id)
+    )
+    """)
+
     # Migration: ensure 'marked_by' column exists on 'attendance'
     try:
         cursor.execute("PRAGMA table_info(attendance)")

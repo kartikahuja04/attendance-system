@@ -4,6 +4,7 @@ const navItems = [
     { path: '/dashboard', label: 'Dashboard' },
     { path: '/mark-attendance', label: 'Mark Attendance' },
     { path: '/view-attendance', label: 'View Attendance' },
+    { path: '/timetable', label: 'Timetable' },
     { path: '/directory', label: 'Teacher Directory' },
     { path: '/profile', label: 'Profile' },
 ];

@@ -8,6 +8,7 @@ import ViewAttendance from './pages/ViewAttendance';
 import TeacherDirectory from './pages/TeacherDirectory';
 import TeacherProfile from './pages/TeacherProfile';
 import SessionPage from './pages/SessionPage';
+import ManageSchedule from './pages/ManageSchedule';
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth();
@@ -67,6 +68,14 @@ function App() {
               element={
                 <ProtectedRoute>
                   <TeacherProfile />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/timetable"
+              element={
+                <ProtectedRoute>
+                  <ManageSchedule />
                 </ProtectedRoute>
               }
             />

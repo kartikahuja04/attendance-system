@@ -1,12 +1,51 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
+import '../services/face_recognition_service.dart';
 import 'camera_screen.dart';
 import 'history_screen.dart';
 import 'login_screen.dart';
+import 'face_enrollment_screen.dart';
 
-class HomeScreen extends StatelessWidget {
+class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
+
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  final FaceRecognitionService _faceRecognitionService = FaceRecognitionService();
+  bool _isCheckingEnrollment = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkFaceEnrollment();
+  }
+
+  Future<void> _checkFaceEnrollment() async {
+    // Skip enrollment check on web
+    if (kIsWeb) {
+      setState(() => _isCheckingEnrollment = false);
+      return;
+    }
+
+    final isEnrolled = await _faceRecognitionService.isFaceEnrolled();
+    
+    if (!isEnrolled && mounted) {
+      // Redirect to face enrollment
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (_) => const FaceEnrollmentScreen()),
+      );
+      return;
+    }
+    
+    if (mounted) {
+      setState(() => _isCheckingEnrollment = false);
+    }
+  }
 
   Future<void> _handleLogout(BuildContext context) async {
     final confirmed = await showDialog<bool>(
@@ -41,6 +80,22 @@ class HomeScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Show loading while checking enrollment
+    if (_isCheckingEnrollment) {
+      return const Scaffold(
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(height: 16),
+              Text('Loading...'),
+            ],
+          ),
+        ),
+      );
+    }
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('QuickMark'),
