@@ -3,9 +3,11 @@ from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse, Stre
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.exceptions import RequestValidationError
 from datetime import datetime, timedelta
 import qrcode, io, base64, secrets
 import os
+from dotenv import load_dotenv
 import hmac
 import hashlib
 import openpyxl
@@ -20,20 +22,36 @@ try:
 except Exception:  # fallback when executed within the package context
     from .db import conn, cursor
 
+# Load env early for Mongo/CORS
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+PROJECT_ROOT = os.path.abspath(os.path.join(BASE_DIR, os.pardir))
+load_dotenv(os.path.join(PROJECT_ROOT, '.env'))
+load_dotenv()
+
+# Attempt Mongo connection and ensure indexes
+try:
+    from backend.mongo import connect_mongo, init_indexes, MONGO_INIT_ERROR
+except Exception:
+    from .mongo import connect_mongo, init_indexes, MONGO_INIT_ERROR
+
+_mongo_db = connect_mongo()
+_ = init_indexes()
+
 app = FastAPI()
 
 # Add CORS middleware for React frontend
+allowed_origins = os.getenv("ALLOWED_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173")
+origins_list = [o.strip() for o in allowed_origins.split(",") if o.strip()]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],  # Vite dev server
+    allow_origins=origins_list,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 # Resolve absolute paths for static and templates based on project root
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-PROJECT_ROOT = os.path.abspath(os.path.join(BASE_DIR, os.pardir))
+# Paths already defined above
 STATIC_DIR = os.path.join(PROJECT_ROOT, "static")
 TEMPLATES_DIR = os.path.join(PROJECT_ROOT, "templates")
 UPLOADS_DIR = os.path.join(PROJECT_ROOT, "uploads")
@@ -47,6 +65,33 @@ app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 app.mount("/uploads", StaticFiles(directory=UPLOADS_DIR), name="uploads")
 
 templates = Jinja2Templates(directory=TEMPLATES_DIR)
+
+# Centralized error handlers for consistent API responses
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request: Request, exc: HTTPException):
+    return JSONResponse(status_code=exc.status_code, content={"message": exc.detail})
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    return JSONResponse(status_code=422, content={"message": "Validation error", "errors": exc.errors()})
+
+@app.exception_handler(Exception)
+async def generic_exception_handler(request: Request, exc: Exception):
+    return JSONResponse(status_code=500, content={"message": "Internal server error"})
+
+# Include Mongo-backed routers for new APIs
+try:
+    from backend.routes_auth import router as auth_router
+    from backend.routes_sessions import router as sessions_router
+    from backend.routes_attendance import router as attendance_router
+except Exception:
+    from .routes_auth import router as auth_router
+    from .routes_sessions import router as sessions_router
+    from .routes_attendance import router as attendance_router
+
+app.include_router(auth_router, prefix="/api/auth")
+app.include_router(sessions_router, prefix="/api")
+app.include_router(attendance_router, prefix="/api")
 
 # Simple session management (in production, use proper JWT tokens)
 async def get_current_teacher(
@@ -80,15 +125,43 @@ def _ts_str(v):
 @app.get("/api/health")
 async def health():
     try:
-        # Surface DB init errors clearly
-        from backend.db import DB_INIT_ERROR  # type: ignore
-        if DB_INIT_ERROR:
-            raise RuntimeError(f"DB_INIT_ERROR: {DB_INIT_ERROR}")
-        cursor.execute("SELECT 1")
-        _ = cursor.fetchone()
-        return {"status": "ok"}
+        # Surface Mongo errors when configured
+        if _mongo_db is not None:
+            from backend.mongo import MONGO_INIT_ERROR  # type: ignore
+            if MONGO_INIT_ERROR:
+                raise RuntimeError(f"MONGO_INIT_ERROR: {MONGO_INIT_ERROR}")
+            # Ping via admin when connected
+            from backend.mongo import client  # type: ignore
+            client.admin.command('ping')
+            return {"status": "ok", "db": "mongo"}
+        else:
+            # Fallback health using existing cursor
+            from backend.db import DB_INIT_ERROR  # type: ignore
+            if DB_INIT_ERROR:
+                raise RuntimeError(f"DB_INIT_ERROR: {DB_INIT_ERROR}")
+            cursor.execute("SELECT 1")
+            _ = cursor.fetchone()
+            return {"status": "ok", "db": "sql"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"health_failed: {e}")
+
+# Debug: inspect Mongo connection on demand
+@app.get("/api/debug/mongo")
+async def debug_mongo():
+    try:
+        try:
+            from backend.mongo import connect_mongo, get_db, MONGO_INIT_ERROR  # type: ignore
+        except Exception:
+            from .mongo import connect_mongo, get_db, MONGO_INIT_ERROR  # type: ignore
+        db_try = connect_mongo()
+        db_now = get_db()
+        return {
+            "connect_returned": str(type(db_try)) if db_try is not None else None,
+            "get_db_returned": str(type(db_now)) if db_now is not None else None,
+            "mongo_init_error": MONGO_INIT_ERROR,
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"debug_mongo_failed: {e}")
 
 # Home page - redirect to login
 @app.get("/", response_class=HTMLResponse)

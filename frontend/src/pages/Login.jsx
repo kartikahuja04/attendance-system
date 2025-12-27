@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
 export default function Login() {
@@ -19,7 +19,7 @@ export default function Login() {
             await login(username, password);
             navigate('/dashboard');
         } catch (err) {
-            setError('Invalid username or password');
+            setError(err?.error || 'Invalid email or password');
         } finally {
             setLoading(false);
         }
@@ -47,11 +47,11 @@ export default function Login() {
                     <form onSubmit={handleSubmit}>
                         <div className="mb-4">
                             <label htmlFor="username" className="label">
-                                Username
+                                Email
                             </label>
                             <input
                                 id="username"
-                                type="text"
+                                type="email"
                                 value={username}
                                 onChange={(e) => setUsername(e.target.value)}
                                 className="input"
@@ -82,9 +82,10 @@ export default function Login() {
                         </button>
                     </form>
 
-                    <div className="mt-4 pt-4 border-t border-border">
-                        <p className="text-xs text-text-secondary text-center">
-                            Default: admin / admin123
+                    <div className="mt-4 pt-4 border-t border-border text-center">
+                        <p className="text-xs text-text-secondary">
+                            Don’t have an account?{' '}
+                            <Link to="/signup" className="text-blue-600 hover:underline">Sign up</Link>
                         </p>
                     </div>
                 </div>

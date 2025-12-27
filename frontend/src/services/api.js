@@ -13,13 +13,15 @@ const api = axios.create({
 // Add request interceptor to attach auth token
 api.interceptors.request.use(
     (config) => {
-        // Get auth token from localStorage
+        // Attach JWT Authorization header if available
         const user = localStorage.getItem('user');
         if (user) {
             try {
                 const userData = JSON.parse(user);
-                if (userData.id) {
-                    // Send token as custom header
+                if (userData.token) {
+                    config.headers['Authorization'] = `Bearer ${userData.token}`;
+                } else if (userData.id) {
+                    // Fallback: support legacy header for older endpoints
                     config.headers['X-Auth-Token'] = userData.id;
                 }
             } catch (e) {
@@ -48,14 +50,17 @@ api.interceptors.response.use(
 );
 
 
-// Auth
-export const login = async (username, password) => {
-    const formData = new FormData();
-    formData.append('username', username);
-    formData.append('password', password);
-    return api.post('/api/login', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-    });
+// Auth (JWT)
+export const login = async (email, password) => {
+    return api.post('/api/auth/login', { email, password });
+};
+
+export const signup = async (name, email, password, role = 'teacher') => {
+    return api.post('/api/auth/signup', { name, email, password, role });
+};
+
+export const me = async () => {
+    return api.get('/api/auth/me');
 };
 
 export const logout = () => api.get('/logout');

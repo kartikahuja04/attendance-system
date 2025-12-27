@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect } from 'react';
-import { login as apiLogin, logout as apiLogout } from '../services/api';
+import api, { login as apiLogin, logout as apiLogout, signup as apiSignup, me as apiMe } from '../services/api';
 
 const AuthContext = createContext(null);
 
@@ -8,27 +8,46 @@ export const AuthProvider = ({ children }) => {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        // Check if user is logged in (you can add a /api/me endpoint)
-        const storedUser = localStorage.getItem('user');
-        if (storedUser) {
-            try {
-                setUser(JSON.parse(storedUser));
-            } catch (e) {
-                localStorage.removeItem('user');
+        const init = async () => {
+            const storedUser = localStorage.getItem('user');
+            if (storedUser) {
+                try {
+                    const parsed = JSON.parse(storedUser);
+                    setUser(parsed);
+                    // Validate token and refresh user profile
+                    try {
+                        const res = await api.get('/api/auth/me');
+                        const merged = { ...parsed, ...res.data.user };
+                        setUser(merged);
+                        localStorage.setItem('user', JSON.stringify(merged));
+                    } catch (e) {
+                        // Token invalid; clear session
+                        localStorage.removeItem('user');
+                        setUser(null);
+                    }
+                } catch (e) {
+                    localStorage.removeItem('user');
+                    setUser(null);
+                }
             }
-        }
-        setLoading(false);
+            setLoading(false);
+        };
+        init();
     }, []);
 
     const login = async (username, password) => {
         try {
             console.log('[Auth] Attempting login...');
+            // Treat username as email for JWT auth
             const response = await apiLogin(username, password);
             console.log('[Auth] Login response:', response.data);
 
             const userData = {
-                username,
-                id: response.data?.user?.id
+                token: response.data?.token,
+                id: response.data?.user?.id,
+                name: response.data?.user?.name,
+                email: response.data?.user?.email,
+                role: response.data?.user?.role,
             };
             setUser(userData);
             localStorage.setItem('user', JSON.stringify(userData));
@@ -56,6 +75,29 @@ export const AuthProvider = ({ children }) => {
         }
     };
 
+    const signup = async (name, email, password, role = 'teacher') => {
+        try {
+            const res = await apiSignup(name, email, password, role);
+            // Immediately login after signup
+            const loginRes = await apiLogin(email, password);
+            const userData = {
+                token: loginRes.data?.token,
+                id: loginRes.data?.user?.id,
+                name: loginRes.data?.user?.name,
+                email: loginRes.data?.user?.email,
+                role: loginRes.data?.user?.role,
+            };
+            setUser(userData);
+            localStorage.setItem('user', JSON.stringify(userData));
+            return { success: true };
+        } catch (error) {
+            let msg = 'Signup failed';
+            if (error.response?.data?.detail) msg = error.response.data.detail;
+            else if (error.message) msg = error.message;
+            return { success: false, error: msg };
+        }
+    };
+
     const logout = async () => {
         try {
             await apiLogout();
@@ -68,7 +110,7 @@ export const AuthProvider = ({ children }) => {
     };
 
     return (
-        <AuthContext.Provider value={{ user, login, logout, loading }}>
+        <AuthContext.Provider value={{ user, login, signup, logout, loading }}>
             {children}
         </AuthContext.Provider>
     );
