@@ -1,4 +1,11 @@
-import requests
+try:
+    import requests
+except ImportError:
+    print("Error: 'requests' package not found.")
+    print("Install with: pip install requests")
+    import sys
+    sys.exit(1)
+
 import json
 
 BASE_URL = "http://localhost:8000"
