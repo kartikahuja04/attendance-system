@@ -3,8 +3,10 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../services/face_recognition_service.dart';
+import '../utils/theme.dart';
 import 'camera_screen.dart';
 import 'history_screen.dart';
+import 'timetable_screen.dart';
 import 'login_screen.dart';
 import 'face_enrollment_screen.dart';
 
@@ -18,6 +20,7 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   final FaceRecognitionService _faceRecognitionService = FaceRecognitionService();
   bool _isCheckingEnrollment = true;
+  int _currentIndex = 0;
 
   @override
   void initState() {
@@ -26,22 +29,28 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _checkFaceEnrollment() async {
-    // Skip enrollment check on web
     if (kIsWeb) {
       setState(() => _isCheckingEnrollment = false);
       return;
     }
 
-    final isEnrolled = await _faceRecognitionService.isFaceEnrolled();
-    
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final studentId = authProvider.currentUser?.studentId;
+
+    if (studentId == null) {
+      setState(() => _isCheckingEnrollment = false);
+      return;
+    }
+
+    final isEnrolled = await _faceRecognitionService.isFaceEnrolled(studentId);
+
     if (!isEnrolled && mounted) {
-      // Redirect to face enrollment
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(builder: (_) => const FaceEnrollmentScreen()),
       );
       return;
     }
-    
+
     if (mounted) {
       setState(() => _isCheckingEnrollment = false);
     }
@@ -51,6 +60,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         title: const Text('Logout'),
         content: const Text('Are you sure you want to logout?'),
         actions: [
@@ -60,6 +70,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
+            style: TextButton.styleFrom(foregroundColor: AppTheme.errorColor),
             child: const Text('Logout'),
           ),
         ],
@@ -80,152 +91,334 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // Show loading while checking enrollment
     if (_isCheckingEnrollment) {
-      return const Scaffold(
+      return Scaffold(
+        backgroundColor: AppTheme.backgroundColor,
         body: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              CircularProgressIndicator(),
-              SizedBox(height: 16),
-              Text('Loading...'),
-            ],
+          child: CircularProgressIndicator(
+            valueColor: AlwaysStoppedAnimation<Color>(AppTheme.primaryColor),
           ),
         ),
       );
     }
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('QuickMark'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.logout),
-            onPressed: () => _handleLogout(context),
-            tooltip: 'Logout',
+      backgroundColor: AppTheme.backgroundColor,
+      body: SafeArea(
+        child: IndexedStack(
+          index: _currentIndex,
+          children: [
+            _buildMainPage(),
+            const HistoryScreen(),
+            const TimetableScreen(),
+            _buildAnnouncementsPage(),
+          ],
+        ),
+      ),
+      bottomNavigationBar: Container(
+        decoration: BoxDecoration(
+          color: AppTheme.cardColor,
+          border: Border(
+            top: BorderSide(color: AppTheme.borderColor, width: 1),
+          ),
+        ),
+        child: BottomNavigationBar(
+          currentIndex: _currentIndex,
+          onTap: (index) => setState(() => _currentIndex = index),
+          type: BottomNavigationBarType.fixed,
+          backgroundColor: AppTheme.cardColor,
+          selectedItemColor: AppTheme.primaryColor,
+          unselectedItemColor: AppTheme.textSecondary,
+          selectedFontSize: 12,
+          unselectedFontSize: 12,
+          elevation: 0,
+          items: const [
+            BottomNavigationBarItem(
+              icon: Icon(Icons.home_rounded),
+              label: 'Home',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.history_rounded),
+              label: 'Attendance',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.calendar_month_rounded),
+              label: 'Timetable',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.campaign_rounded),
+              label: 'Notices',
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMainPage() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Welcome Header
+          _buildWelcomeHeader(),
+          const SizedBox(height: 24),
+
+          // Quick Reminder Card
+          _buildReminderCard(),
+          const SizedBox(height: 24),
+
+          // Attendance Summary Section
+          _buildAttendanceSummary(),
+          const SizedBox(height: 24),
+
+          // Scan QR Button (Primary Action)
+          _buildScanButton(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildWelcomeHeader() {
+    return Consumer<AuthProvider>(
+      builder: (context, authProvider, _) {
+        final studentId = authProvider.currentUser?.studentId ?? 'Student';
+
+        return Row(
+          children: [
+            Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                color: AppTheme.primaryColor.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(
+                Icons.person,
+                color: AppTheme.primaryColor,
+                size: 26,
+              ),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Welcome',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: AppTheme.textSecondary,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    studentId,
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                      color: AppTheme.textPrimary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            IconButton(
+              onPressed: () => _handleLogout(context),
+              icon: Icon(
+                Icons.logout_rounded,
+                color: AppTheme.textSecondary,
+                size: 22,
+              ),
+              tooltip: 'Logout',
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildReminderCard() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppTheme.primaryColor,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.2),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: const Icon(
+              Icons.notifications_active_rounded,
+              color: Colors.white,
+              size: 22,
+            ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Reminders',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 15,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Don\'t forget to mark attendance for today\'s classes',
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.85),
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
       ),
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+    );
+  }
+
+  Widget _buildAttendanceSummary() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Attendance Summary',
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+            color: AppTheme.textPrimary,
+          ),
+        ),
+        const SizedBox(height: 12),
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: AppTheme.cardColor,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: AppTheme.borderColor),
+          ),
+          child: Row(
             children: [
-              // Welcome Card
-              Consumer<AuthProvider>(
-                builder: (context, authProvider, _) {
-                  final studentId = authProvider.currentUser?.studentId ?? 'Unknown';
-                  
-                  return Card(
-                    child: Padding(
-                      padding: const EdgeInsets.all(20),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              CircleAvatar(
-                                radius: 30,
-                                backgroundColor: Theme.of(context).colorScheme.primaryContainer,
-                                child: Icon(
-                                  Icons.person,
-                                  size: 32,
-                                  color: Theme.of(context).colorScheme.onPrimaryContainer,
-                                ),
-                              ),
-                              const SizedBox(width: 16),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      'Welcome Back!',
-                                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                            color: Colors.grey[600],
-                                          ),
-                                    ),
-                                    const SizedBox(height: 4),
-                                    Text(
-                                      studentId,
-                                      style: Theme.of(context).textTheme.headlineMedium,
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                  );
-                },
-              ),
-              const SizedBox(height: 32),
+              _buildStatItem('Total', '42', AppTheme.primaryColor),
+              _buildStatDivider(),
+              _buildStatItem('Present', '38', AppTheme.successColor),
+              _buildStatDivider(),
+              _buildStatItem('Absent', '4', AppTheme.errorColor),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
 
-              // Main Actions
-              Expanded(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    // Scan QR Code Button
-                    _ActionCard(
-                      icon: Icons.qr_code_scanner,
-                      title: 'Scan QR Code',
-                      subtitle: 'Mark your attendance',
-                      color: Theme.of(context).colorScheme.primary,
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (_) => const CameraScreen()),
-                        );
-                      },
-                    ),
-                    const SizedBox(height: 20),
+  Widget _buildStatItem(String label, String value, Color color) {
+    return Expanded(
+      child: Column(
+        children: [
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+              color: color,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              color: AppTheme.textSecondary,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
-                    // View History Button
-                    _ActionCard(
-                      icon: Icons.history,
-                      title: 'Attendance History',
-                      subtitle: 'View your attendance records',
-                      color: Theme.of(context).colorScheme.secondary,
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (_) => const HistoryScreen()),
-                        );
-                      },
-                    ),
-                  ],
-                ),
-              ),
+  Widget _buildStatDivider() {
+    return Container(
+      width: 1,
+      height: 40,
+      color: AppTheme.borderColor,
+    );
+  }
 
-              // Footer Info
+  Widget _buildScanButton() {
+    return Material(
+      color: AppTheme.cardColor,
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const CameraScreen()),
+          );
+        },
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: AppTheme.borderColor),
+          ),
+          child: Row(
+            children: [
               Container(
-                padding: const EdgeInsets.all(16),
+                width: 56,
+                height: 56,
                 decoration: BoxDecoration(
-                  color: Colors.grey[100],
+                  color: AppTheme.primaryColor,
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
+                child: const Icon(
+                  Icons.qr_code_scanner_rounded,
+                  color: Colors.white,
+                  size: 28,
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Icon(
-                      Icons.security,
-                      size: 16,
-                      color: Colors.grey[600],
-                    ),
-                    const SizedBox(width: 8),
                     Text(
-                      'Secured with liveness detection',
+                      'Scan QR Code',
                       style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey[600],
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: AppTheme.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Mark your attendance',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: AppTheme.textSecondary,
                       ),
                     ),
                   ],
                 ),
+              ),
+              Icon(
+                Icons.arrow_forward_ios_rounded,
+                color: AppTheme.textSecondary,
+                size: 18,
               ),
             ],
           ),
@@ -233,72 +426,53 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
     );
   }
-}
 
-class _ActionCard extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final String subtitle;
-  final Color color;
-  final VoidCallback onTap;
-
-  const _ActionCard({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-    required this.color,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      elevation: 4,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: color.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Icon(
-                  icon,
-                  size: 40,
-                  color: color,
-                ),
-              ),
-              const SizedBox(width: 20),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: Theme.of(context).textTheme.titleLarge,
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      subtitle,
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            color: Colors.grey[600],
-                          ),
-                    ),
-                  ],
-                ),
-              ),
-              Icon(
-                Icons.arrow_forward_ios,
-                color: Colors.grey[400],
-              ),
-            ],
+  Widget _buildAnnouncementsPage() {
+    return Padding(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Announcements',
+            style: TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+              color: AppTheme.textPrimary,
+            ),
           ),
-        ),
+          const SizedBox(height: 20),
+          Expanded(
+            child: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.campaign_outlined,
+                    size: 64,
+                    color: AppTheme.textSecondary.withOpacity(0.5),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'No announcements yet',
+                    style: TextStyle(
+                      fontSize: 16,
+                      color: AppTheme.textSecondary,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Check back later for updates',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: AppTheme.textSecondary.withOpacity(0.7),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

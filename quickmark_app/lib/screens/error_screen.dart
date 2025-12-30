@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../widgets/custom_button.dart';
+import '../utils/theme.dart';
 
 class ErrorScreen extends StatelessWidget {
   final String errorMessage;
@@ -19,8 +20,8 @@ class ErrorScreen extends StatelessWidget {
   }
 
   Color get _errorColor {
-    if (errorType == 'already_marked') return Colors.orange;
-    return Colors.red;
+    if (errorType == 'already_marked') return AppTheme.warningColor;
+    return AppTheme.errorColor;
   }
 
   @override

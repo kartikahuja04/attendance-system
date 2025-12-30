@@ -1,52 +1,68 @@
 import 'package:flutter/material.dart';
 
 class AppTheme {
-  // Color Palette
-  static const Color primaryColor = Color(0xFF6750A4); // Purple
-  static const Color secondaryColor = Color(0xFF625B71);
-  static const Color tertiaryColor = Color(0xFF7D5260);
-  static const Color errorColor = Color(0xFFB3261E);
-  static const Color successColor = Color(0xFF4CAF50);
-  static const Color backgroundColor = Color(0xFFFFFBFE);
-  static const Color surfaceColor = Color(0xFFFFFBFE);
+  // Color Palette - Matching Frontend Institutional Design
+  static const Color primaryColor = Color(0xFF4f46e5);      // Indigo
+  static const Color primaryHoverColor = Color(0xFF4338ca); // Indigo darker
+  static const Color secondaryColor = Color(0xFF6b7280);    // Gray
+  static const Color errorColor = Color(0xFFdc2626);        // Red
+  static const Color successColor = Color(0xFF16a34a);      // Green
+  static const Color warningColor = Color(0xFFd97706);      // Amber
+  static const Color backgroundColor = Color(0xFFf5f5f5);   // Light gray
+  static const Color surfaceColor = Color(0xFFffffff);      // White
+  static const Color cardColor = Color(0xFFffffff);         // White
+  static const Color borderColor = Color(0xFFe5e7eb);       // Light gray border
+  static const Color textPrimary = Color(0xFF1f2937);       // Dark gray
+  static const Color textSecondary = Color(0xFF6b7280);     // Medium gray
 
   // Light Theme
   static ThemeData get lightTheme {
     return ThemeData(
       useMaterial3: true,
-      colorScheme: ColorScheme.fromSeed(
-        seedColor: primaryColor,
-        brightness: Brightness.light,
+      colorScheme: const ColorScheme.light(
+        primary: primaryColor,
+        onPrimary: Colors.white,
+        secondary: secondaryColor,
+        onSecondary: Colors.white,
         error: errorColor,
+        onError: Colors.white,
+        surface: surfaceColor,
+        onSurface: textPrimary,
       ),
+      scaffoldBackgroundColor: backgroundColor,
       
       // App Bar Theme
       appBarTheme: const AppBarTheme(
         centerTitle: true,
         elevation: 0,
-        backgroundColor: Colors.transparent,
-        foregroundColor: Colors.black87,
+        backgroundColor: surfaceColor,
+        foregroundColor: textPrimary,
+        surfaceTintColor: Colors.transparent,
       ),
 
-      // Card Theme
-      cardTheme: const CardThemeData(
-        elevation: 2,
+      // Card Theme - Clean with subtle border
+      cardTheme: CardThemeData(
+        elevation: 0,
+        color: cardColor,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.all(Radius.circular(16)),
+          borderRadius: const BorderRadius.all(Radius.circular(12)),
+          side: BorderSide(color: borderColor),
         ),
-        margin: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        margin: const EdgeInsets.symmetric(horizontal: 0, vertical: 8),
       ),
 
       // Elevated Button Theme
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
-          elevation: 2,
-          padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+          elevation: 0,
+          backgroundColor: primaryColor,
+          foregroundColor: Colors.white,
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(8),
           ),
           textStyle: const TextStyle(
-            fontSize: 16,
+            fontSize: 15,
             fontWeight: FontWeight.w600,
           ),
         ),
@@ -55,6 +71,7 @@ class AppTheme {
       // Text Button Theme
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
+          foregroundColor: primaryColor,
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(8),
@@ -65,24 +82,24 @@ class AppTheme {
       // Input Decoration Theme
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: Colors.grey[100],
+        fillColor: surfaceColor,
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide.none,
+          borderRadius: BorderRadius.circular(8),
+          borderSide: BorderSide(color: borderColor),
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide.none,
+          borderRadius: BorderRadius.circular(8),
+          borderSide: BorderSide(color: borderColor),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(8),
           borderSide: const BorderSide(color: primaryColor, width: 2),
         ),
         errorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(8),
           borderSide: const BorderSide(color: errorColor, width: 1),
         ),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       ),
 
       // Text Theme

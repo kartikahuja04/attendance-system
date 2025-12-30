@@ -61,4 +61,6 @@ class DeviceUtils {
       return 'Unknown OS';
     }
   }
+  // Alias for backward compatibility
+  static Future<String> getDeviceId() => generateDeviceId();
 }

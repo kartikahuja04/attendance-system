@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
+import '../utils/theme.dart';
 import 'login_screen.dart';
 import 'home_screen.dart';
 
@@ -46,51 +47,60 @@ class _SplashScreenState extends State<SplashScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              Theme.of(context).colorScheme.primary,
-              Theme.of(context).colorScheme.secondary,
-            ],
-          ),
-        ),
+      backgroundColor: AppTheme.primaryColor,
+      body: SafeArea(
         child: Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               // App Icon/Logo
-              Icon(
-                Icons.qr_code_scanner,
-                size: 100,
-                color: Colors.white,
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: const Icon(
+                  Icons.qr_code_scanner,
+                  size: 72,
+                  color: Colors.white,
+                ),
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 32),
               
               // App Name
-              Text(
+              const Text(
                 'QuickMark',
-                style: Theme.of(context).textTheme.displayLarge?.copyWith(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                    ),
+                style: TextStyle(
+                  fontSize: 36,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                  letterSpacing: 1,
+                ),
               ),
               const SizedBox(height: 8),
               
               // Tagline
               Text(
-                'Smart Attendance System',
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      color: Colors.white.withOpacity(0.9),
-                    ),
+                'College Attendance System',
+                style: TextStyle(
+                  fontSize: 16,
+                  color: Colors.white.withOpacity(0.9),
+                  fontWeight: FontWeight.w400,
+                ),
               ),
               const SizedBox(height: 48),
               
               // Loading indicator
-              const CircularProgressIndicator(
-                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+              SizedBox(
+                width: 28,
+                height: 28,
+                child: CircularProgressIndicator(
+                  strokeWidth: 3,
+                  valueColor: AlwaysStoppedAnimation<Color>(
+                    Colors.white.withOpacity(0.9),
+                  ),
+                ),
               ),
             ],
           ),
@@ -99,3 +109,4 @@ class _SplashScreenState extends State<SplashScreen> {
     );
   }
 }
+

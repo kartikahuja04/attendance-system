@@ -4,9 +4,12 @@ import 'package:flutter/services.dart';
 import 'package:camera/camera.dart';
 import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:provider/provider.dart';
+import '../providers/auth_provider.dart';
 import '../services/liveness_service.dart';
 import '../services/face_recognition_service.dart';
 import '../widgets/camera_overlay.dart';
+import '../utils/theme.dart';
 import 'home_screen.dart';
 
 /// Screen for enrolling user's face for the first time
@@ -40,8 +43,7 @@ class _FaceEnrollmentScreenState extends State<FaceEnrollmentScreen> with Widget
 
   // Liveness check status
   bool _faceDetected = false;
-  bool _blinkDetected = false;
-  bool _headMoved = false;
+  LivenessTask? _currentTask;
 
   @override
   void initState() {
@@ -144,10 +146,9 @@ class _FaceEnrollmentScreenState extends State<FaceEnrollmentScreen> with Widget
       if (mounted && !_isDisposed) {
         setState(() {
           _message = result.message;
-          _livenessProgress = result.score;
+          _livenessProgress = result.progress;
           _faceDetected = result.faceDetected;
-          _blinkDetected = result.blinkDetected;
-          _headMoved = result.headMovementDetected;
+          _currentTask = result.currentTask;
         });
 
         if (result.passed && result.faceDetected) {
@@ -202,11 +203,23 @@ class _FaceEnrollmentScreenState extends State<FaceEnrollmentScreen> with Widget
       debugPrint('Face bounding box: ${face.boundingBox}');
       debugPrint('Face landmarks count: ${face.landmarks.length}');
       
-      final result = await _faceRecognitionService.enrollFace(image, face);
+      // Get current user ID
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      final studentId = authProvider.currentUser?.studentId;
+      
+      if (studentId == null) {
+        _handleEnrollmentError('Validation error: No active user session');
+        return;
+      }
+
+      final result = await _faceRecognitionService.enrollFace(image, face, studentId);
       debugPrint('Enrollment result - recognized: ${result.recognized}, similarity: ${result.similarity}');
       debugPrint('Enrollment message: ${result.message}');
 
       if (result.recognized) {
+        // Reload user to get updated enrollment status
+        await authProvider.reloadUser();
+        
         HapticFeedback.heavyImpact();
         debugPrint('=== Face enrollment SUCCESS ===');
         
@@ -217,9 +230,11 @@ class _FaceEnrollmentScreenState extends State<FaceEnrollmentScreen> with Widget
 
           await Future.delayed(const Duration(milliseconds: 1000));
 
-          Navigator.of(context).pushReplacement(
-            MaterialPageRoute(builder: (_) => const HomeScreen()),
-          );
+          if (mounted) {
+            Navigator.of(context).pushReplacement(
+              MaterialPageRoute(builder: (_) => const HomeScreen()),
+            );
+          }
         }
       } else {
         debugPrint('=== Face enrollment FAILED: ${result.message} ===');
@@ -334,55 +349,10 @@ class _FaceEnrollmentScreenState extends State<FaceEnrollmentScreen> with Widget
               progress: _livenessProgress,
               showProgress: true,
               faceDetected: _faceDetected,
-              blinkDetected: _blinkDetected,
-              headMoved: _headMoved,
+              currentTask: _currentTask,
               isQrMode: false,
               onCancel: () => Navigator.of(context).pop(),
             ),
-
-          // Title
-          Positioned(
-            top: 50,
-            left: 0,
-            right: 0,
-            child: SafeArea(
-              child: Column(
-                children: [
-                  Container(
-                    margin: const EdgeInsets.symmetric(horizontal: 20),
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                    decoration: BoxDecoration(
-                      color: Colors.blue.withOpacity(0.9),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: const Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.face, color: Colors.white, size: 20),
-                        SizedBox(width: 8),
-                        Text(
-                          'Face Enrollment',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  const Text(
-                    'Register your face for secure attendance',
-                    style: TextStyle(
-                      color: Colors.white70,
-                      fontSize: 14,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
 
           // Loading indicator during enrollment
           if (_isEnrolling)

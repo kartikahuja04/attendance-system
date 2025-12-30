@@ -1,14 +1,17 @@
 import 'package:flutter/material.dart';
+import '../services/liveness_service.dart';
+import '../utils/theme.dart';
 
 class CameraOverlay extends StatelessWidget {
   final String message;
   final double progress;
   final bool showProgress;
   final bool faceDetected;
-  final bool blinkDetected;
-  final bool headMoved;
+  final LivenessTask? currentTask;
   final bool isQrMode;
   final VoidCallback? onCancel;
+  final int currentTaskNumber;
+  final int totalTasks;
 
   const CameraOverlay({
     super.key,
@@ -16,10 +19,11 @@ class CameraOverlay extends StatelessWidget {
     this.progress = 0.0,
     this.showProgress = false,
     this.faceDetected = false,
-    this.blinkDetected = false,
-    this.headMoved = false,
+    this.currentTask,
     this.isQrMode = false,
     this.onCancel,
+    this.currentTaskNumber = 0,
+    this.totalTasks = 3,
   });
 
   @override
@@ -38,29 +42,55 @@ class CameraOverlay extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
             margin: const EdgeInsets.symmetric(horizontal: 24),
             decoration: BoxDecoration(
-              color: Colors.black.withOpacity(0.75),
-              borderRadius: BorderRadius.circular(16),
+              color: Colors.black.withOpacity(0.85),
+              borderRadius: BorderRadius.circular(12),
               border: Border.all(
-                color: Colors.white.withOpacity(0.2),
-                width: 1,
+                color: AppTheme.primaryColor.withOpacity(0.4),
+                width: 1.5,
               ),
             ),
             child: Column(
               children: [
+                // Task Counter (1/3, 2/3, etc.)
+                if (showProgress && !isQrMode && totalTasks > 0)
+                  Container(
+                    margin: const EdgeInsets.only(bottom: 10),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: AppTheme.primaryColor,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      'Task $currentTaskNumber/$totalTasks',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
                 Text(
                   message,
                   style: const TextStyle(
                     color: Colors.white,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w500,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
                   ),
                   textAlign: TextAlign.center,
                 ),
                 if (showProgress) ...[
                   const SizedBox(height: 16),
-                  // Liveness check indicators
-                  _buildLivenessIndicators(),
-                  const SizedBox(height: 12),
+                  
+                  // Icon for current task
+                  if (currentTask != null)
+                    Icon(
+                      _getTaskIcon(currentTask!),
+                      color: Colors.white,
+                      size: 48,
+                    ),
+                    
+                  const SizedBox(height: 16),
+                  
                   // Progress bar
                   ClipRRect(
                     borderRadius: BorderRadius.circular(6),
@@ -68,17 +98,9 @@ class CameraOverlay extends StatelessWidget {
                       value: progress,
                       backgroundColor: Colors.white.withOpacity(0.2),
                       valueColor: AlwaysStoppedAnimation<Color>(
-                        progress >= 0.7 ? Colors.green : Colors.blue,
+                        progress >= 1.0 ? AppTheme.successColor : AppTheme.primaryColor,
                       ),
-                      minHeight: 8,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    '${(progress * 100).toInt()}% Complete',
-                    style: TextStyle(
-                      color: Colors.white.withOpacity(0.8),
-                      fontSize: 12,
+                      minHeight: 10,
                     ),
                   ),
                 ],
@@ -96,22 +118,33 @@ class CameraOverlay extends StatelessWidget {
             child: Center(
               child: ElevatedButton.icon(
                 onPressed: onCancel,
-                icon: const Icon(Icons.close, size: 20),
+                icon: const Icon(Icons.close, size: 18),
                 label: const Text('Cancel'),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.red.shade600,
+                  backgroundColor: AppTheme.errorColor,
                   foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 14),
+                  elevation: 0,
+                  padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 12),
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(30),
+                    borderRadius: BorderRadius.circular(8),
                   ),
-                  elevation: 4,
                 ),
               ),
             ),
           ),
       ],
     );
+  }
+
+  IconData _getTaskIcon(LivenessTask task) {
+    switch (task) {
+      case LivenessTask.BLINK: return Icons.visibility_off;
+      case LivenessTask.SMILE: return Icons.sentiment_very_satisfied;
+      case LivenessTask.HEAD_LEFT: return Icons.arrow_back; // Points Left
+      case LivenessTask.HEAD_RIGHT: return Icons.arrow_forward; // Points Right
+      case LivenessTask.MOUTH_OPEN: return Icons.mood; // Approximation
+      case LivenessTask.EYEBROW_RAISE: return Icons.arrow_upward;
+    }
   }
 
   Widget _buildOverlayWithCutout(BuildContext context) {
@@ -132,8 +165,8 @@ class CameraOverlay extends StatelessWidget {
       );
     } else {
       // Liveness mode - oval face guide
-      const ovalWidth = 240.0;
-      const ovalHeight = 320.0;
+      const ovalWidth = 280.0;
+      const ovalHeight = 360.0;
       return CustomPaint(
         size: size,
         painter: _FaceOverlayPainter(
@@ -148,66 +181,7 @@ class CameraOverlay extends StatelessWidget {
     }
   }
 
-  Widget _buildLivenessIndicators() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        _buildIndicator(
-          icon: Icons.face,
-          label: 'Face',
-          isComplete: faceDetected,
-        ),
-        const SizedBox(width: 24),
-        _buildIndicator(
-          icon: Icons.visibility,
-          label: 'Blink',
-          isComplete: blinkDetected,
-        ),
-        const SizedBox(width: 24),
-        _buildIndicator(
-          icon: Icons.rotate_left,
-          label: 'Turn',
-          isComplete: headMoved,
-        ),
-      ],
-    );
-  }
-
-  Widget _buildIndicator({
-    required IconData icon,
-    required String label,
-    required bool isComplete,
-  }) {
-    return Column(
-      children: [
-        Container(
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: isComplete ? Colors.green : Colors.white.withOpacity(0.2),
-            shape: BoxShape.circle,
-            border: Border.all(
-              color: isComplete ? Colors.green : Colors.white.withOpacity(0.5),
-              width: 2,
-            ),
-          ),
-          child: Icon(
-            isComplete ? Icons.check : icon,
-            color: Colors.white,
-            size: 20,
-          ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          label,
-          style: TextStyle(
-            color: isComplete ? Colors.green : Colors.white.withOpacity(0.7),
-            fontSize: 10,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-      ],
-    );
-  }
+  // Removed old _buildLivenessIndicators
 }
 
 // Custom painter for face overlay with oval cutout
@@ -249,7 +223,7 @@ class _FaceOverlayPainter extends CustomPainter {
 
     // Draw oval border
     final borderColor = faceDetected
-        ? (progress >= 0.7 ? Colors.green : Colors.blue)
+        ? (progress >= 0.7 ? AppTheme.successColor : AppTheme.primaryColor)
         : Colors.white;
     
     final borderPaint = Paint()
@@ -327,20 +301,20 @@ class _QrOverlayPainter extends CustomPainter {
 
     // Draw border
     final borderPaint = Paint()
-      ..color = Colors.green
+      ..color = AppTheme.primaryColor
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 4;
+      ..strokeWidth = 3;
 
     canvas.drawRRect(
-      RRect.fromRectAndRadius(cutoutRect, const Radius.circular(20)),
+      RRect.fromRectAndRadius(cutoutRect, const Radius.circular(16)),
       borderPaint,
     );
 
     // Draw corner markers
     final cornerPaint = Paint()
-      ..color = Colors.green
+      ..color = AppTheme.primaryColor
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 6
+      ..strokeWidth = 5
       ..strokeCap = StrokeCap.round;
 
     const cornerLength = 40.0;

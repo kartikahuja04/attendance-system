@@ -1,10 +1,10 @@
 import 'package:flutter/foundation.dart';
 import '../models/user_model.dart';
-import '../services/storage_service.dart';
+import '../services/database_service.dart';
 import '../utils/device_utils.dart';
 
 class AuthProvider with ChangeNotifier {
-  final StorageService _storageService = StorageService();
+  final DatabaseService _dbService = DatabaseService();
   
   User? _currentUser;
   bool _isLoading = false;
@@ -15,82 +15,90 @@ class AuthProvider with ChangeNotifier {
   String? get error => _error;
   bool get isLoggedIn => _currentUser != null;
 
-  /// Initialize - check if user is already logged in
+  /// Initialize - try to recover session if we had one (optional)
+  /// For high security, we might require login every time.
   Future<void> initialize() async {
-    _isLoading = true;
-    notifyListeners();
-
-    try {
-      _currentUser = await _storageService.getUser();
-      _error = null;
-    } catch (e) {
-      _error = 'Failed to load user data';
-    } finally {
-      _isLoading = false;
-      notifyListeners();
-    }
+    // For now, require fresh login
   }
 
-  /// Login with student ID
-  Future<bool> login(String studentId) async {
-    if (studentId.trim().isEmpty) {
-      _error = 'Student ID cannot be empty';
-      notifyListeners();
-      return false;
-    }
-
+  /// Login or Register with student ID and Password
+  /// Returns 0: Success, 1: Invalid Credentials, 2: New User (Need Enrollment)
+  Future<int> login(String studentId, String password) async {
     _isLoading = true;
     _error = null;
     notifyListeners();
 
     try {
-      // Get or generate device ID
-      final deviceId = await _storageService.getOrGenerateDeviceId();
+      final user = await _dbService.getUser(studentId);
 
-      // Create user
-      final user = User(
-        studentId: studentId.trim(),
-        deviceId: deviceId,
-      );
-
-      // Save user
-      final success = await _storageService.saveUser(user);
-
-      if (success) {
-        _currentUser = user;
-        _error = null;
-        _isLoading = false;
-        notifyListeners();
-        return true;
+      if (user != null) {
+        // User exists, check password
+        // In a real app, hash this password!
+        if (user.password == password) {
+          _currentUser = user;
+          _isLoading = false;
+          notifyListeners();
+          return 0; // Success
+        } else {
+          _error = 'Invalid password';
+          _isLoading = false;
+          notifyListeners();
+          return 1; // Error
+        }
       } else {
-        _error = 'Failed to save user data';
-        _isLoading = false;
-        notifyListeners();
-        return false;
+        // User does not exist - Register them?
+        // Check requirement: "On first login it ask for face registration"
+        // Implicitly registration.
+        
+        final deviceId = await DeviceUtils.getDeviceId();
+        
+        // Create new user record
+        final newUser = User(
+          studentId: studentId,
+          password: password,
+          deviceId: deviceId,
+          isEnrolled: false,
+          name: 'Student $studentId', // Default name
+          createdAt: DateTime.now().toIso8601String(),
+        );
+
+        final success = await _dbService.saveUser(newUser);
+        
+        if (success) {
+          _currentUser = newUser;
+          _isLoading = false;
+          notifyListeners();
+          return 2; // New User Created -> Go to Enrollment
+        } else {
+          _error = 'Failed to create account';
+          _isLoading = false;
+          notifyListeners();
+          return 1;
+        }
       }
     } catch (e) {
       _error = 'Login failed: $e';
       _isLoading = false;
       notifyListeners();
-      return false;
+      return 1;
+    }
+  }
+  
+  // Update local user data after enrollment
+  Future<void> reloadUser() async {
+    if (_currentUser != null) {
+      final updated = await _dbService.getUser(_currentUser!.studentId);
+      if (updated != null) {
+        _currentUser = updated;
+        notifyListeners();
+      }
     }
   }
 
   /// Logout
   Future<void> logout() async {
-    _isLoading = true;
+    _currentUser = null;
     notifyListeners();
-
-    try {
-      await _storageService.clearUser();
-      _currentUser = null;
-      _error = null;
-    } catch (e) {
-      _error = 'Logout failed: $e';
-    } finally {
-      _isLoading = false;
-      notifyListeners();
-    }
   }
 
   /// Clear error
@@ -98,15 +106,5 @@ class AuthProvider with ChangeNotifier {
     _error = null;
     notifyListeners();
   }
-
-  /// Get device info for display
-  Future<Map<String, String>> getDeviceInfo() async {
-    final model = await DeviceUtils.getDeviceModel();
-    final os = await DeviceUtils.getOsVersion();
-    return {
-      'model': model,
-      'os': os,
-      'deviceId': _currentUser?.deviceId ?? 'Unknown',
-    };
-  }
 }
+

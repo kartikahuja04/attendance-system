@@ -1,10 +1,12 @@
 import 'package:flutter/foundation.dart';
 import '../models/attendance_record.dart';
+import '../services/database_service.dart';
 import '../services/api_service.dart';
 
 enum AttendanceStatus { idle, loading, success, error }
 
 class AttendanceProvider with ChangeNotifier {
+  final DatabaseService _dbService = DatabaseService();
   final ApiService _apiService = ApiService();
 
   List<AttendanceRecord> _attendanceRecords = [];
@@ -31,6 +33,7 @@ class AttendanceProvider with ChangeNotifier {
     notifyListeners();
 
     try {
+      // Submit to backend API so student ID appears on teacher portal
       final result = await _apiService.markAttendance(
         token: token,
         studentId: studentId,
@@ -40,21 +43,36 @@ class AttendanceProvider with ChangeNotifier {
 
       if (result['success'] == true) {
         _status = AttendanceStatus.success;
-        _successMessage = result['message'] as String;
+        _successMessage = result['message'] ?? 'Attendance marked!';
         _error = null;
+        
+        // Also save locally for offline history
+        final parts = token.split(':');
+        final sessionId = parts.isNotEmpty ? parts[0] : 'unknown_session';
+        
+        final record = AttendanceRecord(
+          studentId: studentId,
+          sessionId: sessionId,
+          timestamp: DateTime.now(),
+          status: 'Present',
+          subject: 'Session $sessionId',
+        );
+        await _dbService.markAttendance(record);
+        
+        // Refresh history
+        await fetchAttendanceHistory(studentId);
+        
         notifyListeners();
         return true;
       } else {
         _status = AttendanceStatus.error;
-        _error = result['message'] as String;
-        _successMessage = null;
+        _error = result['message'] ?? 'Failed to mark attendance';
         notifyListeners();
         return false;
       }
     } catch (e) {
       _status = AttendanceStatus.error;
       _error = 'Failed to submit attendance: $e';
-      _successMessage = null;
       notifyListeners();
       return false;
     }
@@ -67,7 +85,7 @@ class AttendanceProvider with ChangeNotifier {
     notifyListeners();
 
     try {
-      _attendanceRecords = await _apiService.getAttendanceHistory(studentId);
+      _attendanceRecords = await _dbService.getAttendanceHistory(studentId);
       _status = AttendanceStatus.success;
       _error = null;
       notifyListeners();
@@ -105,7 +123,10 @@ class AttendanceProvider with ChangeNotifier {
   }
 
   /// Extract token from QR code
+  /// Only accepts QR codes from teacher portal (URL with mark_attendance_form path)
   String? extractToken(String qrData) {
+    if (qrData.isEmpty) return null;
+    // Use ApiService to validate and extract token from teacher portal URL
     return _apiService.extractTokenFromQr(qrData);
   }
 }

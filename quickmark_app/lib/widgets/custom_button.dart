@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../utils/theme.dart';
 
 class CustomButton extends StatelessWidget {
   final String text;
@@ -26,37 +27,42 @@ class CustomButton extends StatelessWidget {
       return OutlinedButton(
         onPressed: isLoading ? null : onPressed,
         style: OutlinedButton.styleFrom(
-          padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+          foregroundColor: AppTheme.primaryColor,
+          side: const BorderSide(color: AppTheme.borderColor),
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(8),
           ),
         ),
-        child: _buildChild(),
+        child: _buildChild(isOutlined: true),
       );
     }
 
     return ElevatedButton(
       onPressed: isLoading ? null : onPressed,
       style: ElevatedButton.styleFrom(
-        backgroundColor: backgroundColor,
-        foregroundColor: textColor,
-        padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+        backgroundColor: backgroundColor ?? AppTheme.primaryColor,
+        foregroundColor: textColor ?? Colors.white,
+        elevation: 0,
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(8),
         ),
       ),
       child: _buildChild(),
     );
   }
 
-  Widget _buildChild() {
+  Widget _buildChild({bool isOutlined = false}) {
     if (isLoading) {
-      return const SizedBox(
+      return SizedBox(
         height: 20,
         width: 20,
         child: CircularProgressIndicator(
           strokeWidth: 2,
-          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+          valueColor: AlwaysStoppedAnimation<Color>(
+            isOutlined ? AppTheme.primaryColor : Colors.white,
+          ),
         ),
       );
     }
@@ -65,7 +71,7 @@ class CustomButton extends StatelessWidget {
       return Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 20),
+          Icon(icon, size: 18),
           const SizedBox(width: 8),
           Text(text),
         ],

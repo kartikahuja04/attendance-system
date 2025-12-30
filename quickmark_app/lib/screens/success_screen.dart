@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../widgets/custom_button.dart';
+import '../utils/theme.dart';
 
 class SuccessScreen extends StatelessWidget {
   final String sessionId;
@@ -26,15 +27,15 @@ class SuccessScreen extends StatelessWidget {
             children: [
               // Success Icon
               Container(
-                padding: const EdgeInsets.all(24),
+                padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
-                  color: Colors.green[50],
+                  color: AppTheme.successColor.withOpacity(0.1),
                   shape: BoxShape.circle,
                 ),
                 child: Icon(
                   Icons.check_circle,
-                  size: 100,
-                  color: Colors.green[600],
+                  size: 80,
+                  color: AppTheme.successColor,
                 ),
               ),
               const SizedBox(height: 32),
@@ -43,7 +44,7 @@ class SuccessScreen extends StatelessWidget {
               Text(
                 'Attendance Marked!',
                 style: Theme.of(context).textTheme.displaySmall?.copyWith(
-                      color: Colors.green[700],
+                      color: AppTheme.successColor,
                       fontWeight: FontWeight.bold,
                     ),
                 textAlign: TextAlign.center,

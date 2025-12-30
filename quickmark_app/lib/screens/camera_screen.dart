@@ -12,6 +12,7 @@ import '../services/face_recognition_service.dart';
 import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
 import '../widgets/camera_overlay.dart';
 import '../utils/constants.dart';
+import '../utils/theme.dart';
 import 'success_screen.dart';
 import 'error_screen.dart';
 
@@ -44,13 +45,13 @@ class _CameraScreenState extends State<CameraScreen> with WidgetsBindingObserver
   bool _isProcessing = false;
   String _message = 'Position your face in the frame';
   double _livenessProgress = 0.0;
+  bool _faceDetected = false;
   bool _cameraInitialized = false;
   bool _isDisposed = false;
 
-  // Liveness check status
-  bool _faceDetected = false;
-  bool _blinkDetected = false;
-  bool _headMoved = false;
+  LivenessTask? _currentTask;
+  int _currentTaskNumber = 0;
+  int _totalTasks = 3;
 
   @override
   void initState() {
@@ -61,7 +62,6 @@ class _CameraScreenState extends State<CameraScreen> with WidgetsBindingObserver
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    // Handle app lifecycle changes
     if (_cameraController == null || !_cameraController!.value.isInitialized) {
       return;
     }
@@ -149,10 +149,11 @@ class _CameraScreenState extends State<CameraScreen> with WidgetsBindingObserver
       if (mounted && !_isDisposed) {
         setState(() {
           _message = result.message;
-          _livenessProgress = result.score;
+          _livenessProgress = result.progress;
           _faceDetected = result.faceDetected;
-          _blinkDetected = result.blinkDetected;
-          _headMoved = result.headMovementDetected;
+          _currentTask = result.currentTask;
+          _currentTaskNumber = result.currentTaskNumber;
+          _totalTasks = result.totalTasks;
         });
 
         if (result.passed && !_isVerifyingFace) {
@@ -166,7 +167,6 @@ class _CameraScreenState extends State<CameraScreen> with WidgetsBindingObserver
         }
       }
     } catch (e) {
-      // Ignore processing errors
       debugPrint('Image processing error: $e');
     } finally {
       _isProcessing = false;
@@ -176,8 +176,17 @@ class _CameraScreenState extends State<CameraScreen> with WidgetsBindingObserver
   /// Verify face matches enrolled face before proceeding
   Future<void> _verifyFaceAndProceed(CameraImage image) async {
     try {
-      // Check if face is enrolled
-      final isEnrolled = await _faceRecognitionService.isFaceEnrolled();
+      // Get current user ID
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      final studentId = authProvider.currentUser?.studentId;
+
+      if (studentId == null) {
+         _handleVerificationError('User not authenticated');
+         return;
+      }
+
+      // Check if face is enrolled using studentId
+      final isEnrolled = await _faceRecognitionService.isFaceEnrolled(studentId);
       if (!isEnrolled) {
         // No face enrolled - proceed with just liveness (fallback)
         HapticFeedback.mediumImpact();
@@ -202,7 +211,13 @@ class _CameraScreenState extends State<CameraScreen> with WidgetsBindingObserver
 
       // Verify face
       final face = faces.first;
-      final result = await _faceRecognitionService.verifyFace(image, face);
+      
+      if (studentId == null) {
+         _handleVerificationError('User not authenticated');
+         return;
+      }
+
+      final result = await _faceRecognitionService.verifyFace(image, face, studentId);
 
       if (result.recognized) {
         // Face verified - switch to QR mode
@@ -433,10 +448,11 @@ class _CameraScreenState extends State<CameraScreen> with WidgetsBindingObserver
               progress: _livenessProgress,
               showProgress: _mode == CameraMode.liveness,
               faceDetected: _faceDetected,
-              blinkDetected: _blinkDetected,
-              headMoved: _headMoved,
+              currentTask: _currentTask,
               isQrMode: _mode == CameraMode.qrScanning,
               onCancel: () => Navigator.of(context).pop(),
+              currentTaskNumber: _currentTaskNumber,
+              totalTasks: _totalTasks,
             ),
 
           // Mode Indicator
@@ -444,19 +460,12 @@ class _CameraScreenState extends State<CameraScreen> with WidgetsBindingObserver
             top: 50,
             right: 20,
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
               decoration: BoxDecoration(
                 color: _mode == CameraMode.liveness
-                    ? Colors.blue.withOpacity(0.9)
-                    : Colors.green.withOpacity(0.9),
-                borderRadius: BorderRadius.circular(20),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.3),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
+                    ? AppTheme.primaryColor
+                    : AppTheme.successColor,
+                borderRadius: BorderRadius.circular(8),
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
@@ -466,16 +475,16 @@ class _CameraScreenState extends State<CameraScreen> with WidgetsBindingObserver
                         ? Icons.face
                         : Icons.qr_code_scanner,
                     color: Colors.white,
-                    size: 18,
+                    size: 16,
                   ),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: 6),
                   Text(
                     _mode == CameraMode.liveness
                         ? 'Liveness Check'
                         : 'QR Scanning',
                     style: const TextStyle(
                       color: Colors.white,
-                      fontSize: 14,
+                      fontSize: 13,
                       fontWeight: FontWeight.w600,
                     ),
                   ),

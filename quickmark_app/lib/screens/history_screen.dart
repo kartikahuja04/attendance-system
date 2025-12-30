@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import '../providers/auth_provider.dart';
 import '../providers/attendance_provider.dart';
 import '../widgets/loading_indicator.dart';
+import '../utils/theme.dart';
 
 class HistoryScreen extends StatefulWidget {
   const HistoryScreen({super.key});
@@ -204,16 +205,16 @@ class _AttendanceCard extends StatelessWidget {
                   ),
                 ),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                   decoration: BoxDecoration(
-                    color: Colors.green[100],
-                    borderRadius: BorderRadius.circular(12),
+                    color: AppTheme.successColor.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(6),
                   ),
                   child: Text(
                     status,
                     style: TextStyle(
-                      color: Colors.green[700],
-                      fontSize: 12,
+                      color: AppTheme.successColor,
+                      fontSize: 11,
                       fontWeight: FontWeight.w600,
                     ),
                   ),

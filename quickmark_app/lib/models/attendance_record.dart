@@ -1,4 +1,5 @@
 class AttendanceRecord {
+  final String? studentId; // New field
   final String sessionId;
   final DateTime timestamp;
   final String status;
@@ -7,6 +8,7 @@ class AttendanceRecord {
   final String? section;
 
   AttendanceRecord({
+    this.studentId,
     required this.sessionId,
     required this.timestamp,
     required this.status,
@@ -15,26 +17,31 @@ class AttendanceRecord {
     this.section,
   });
 
-  // Create AttendanceRecord from JSON
-  factory AttendanceRecord.fromJson(Map<String, dynamic> json) {
+  // Create from DB Map
+  factory AttendanceRecord.fromMap(Map<String, dynamic> map) {
     return AttendanceRecord(
-      sessionId: json['session_id'] as String,
-      timestamp: DateTime.parse(json['timestamp'] as String),
-      status: json['status'] as String? ?? 'Present',
-      className: json['class_name'] as String?,
-      subject: json['subject'] as String?,
-      section: json['section'] as String?,
+      studentId: map['student_id'] as String?,
+      sessionId: map['session_id'] as String,
+      timestamp: DateTime.tryParse(map['timestamp'] as String) ?? DateTime.now(),
+      status: map['status'] as String? ?? 'Present',
+      className: map['class_name'] as String?,
+      subject: map['subject'] as String?,
+      section: map['section'] as String?,
     );
   }
+  
+  // Create from JSON
+  factory AttendanceRecord.fromJson(Map<String, dynamic> json) => AttendanceRecord.fromMap(json);
 
-  // Convert to JSON
-  Map<String, dynamic> toJson() => {
+  // Convert to Map for DB
+  Map<String, dynamic> toMap() => {
+        'student_id': studentId,
         'session_id': sessionId,
         'timestamp': timestamp.toIso8601String(),
         'status': status,
-        if (className != null) 'class_name': className,
-        if (subject != null) 'subject': subject,
-        if (section != null) 'section': section,
+        'class_name': className,
+        'subject': subject,
+        'section': section,
       };
 
   @override

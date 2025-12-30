@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../widgets/custom_button.dart';
+import '../utils/theme.dart';
 import 'home_screen.dart';
+import 'face_enrollment_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -14,11 +16,13 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   final _studentIdController = TextEditingController();
+  final _passwordController = TextEditingController();
   bool _isLoading = false;
 
   @override
   void dispose() {
     _studentIdController.dispose();
+    _passwordController.dispose();
     super.dispose();
   }
 
@@ -30,24 +34,37 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() => _isLoading = true);
 
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
-    final success = await authProvider.login(_studentIdController.text);
+    
+    // Call new login method
+    final result = await authProvider.login(
+      _studentIdController.text, 
+      _passwordController.text
+    );
 
     if (!mounted) return;
+    
+    setState(() => _isLoading = false);
 
-    if (success) {
-      // Navigate to home screen
+    if (result == 0) {
+      // Success - Go to Home
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(builder: (_) => const HomeScreen()),
       );
+    } else if (result == 2) {
+      // New User - Go to Enrollment
+      // Wait, we need to import FaceEnrollmentScreen
+      // For now, assume generic route or I'll add the import
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (_) => const FaceEnrollmentScreen()), // Need to ensure import
+      );
     } else {
-      // Show error
+      // Error
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(authProvider.error ?? 'Login failed'),
           backgroundColor: Colors.red,
         ),
       );
-      setState(() => _isLoading = false);
     }
   }
 
@@ -97,7 +114,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Please enter your Student ID to continue',
+                    'Please enter your credentials',
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                           color: Colors.grey[600],
                         ),
@@ -113,14 +130,36 @@ class _LoginScreenState extends State<LoginScreen> {
                       prefixIcon: Icon(Icons.person),
                     ),
                     keyboardType: TextInputType.text,
-                    textInputAction: TextInputAction.done,
-                    onFieldSubmitted: (_) => _handleLogin(),
+                    textInputAction: TextInputAction.next,
                     validator: (value) {
                       if (value == null || value.trim().isEmpty) {
                         return 'Please enter your student ID';
                       }
                       if (value.trim().length < 3) {
                         return 'Student ID must be at least 3 characters';
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  
+                  // Password Input
+                  TextFormField(
+                    controller: _passwordController,
+                    decoration: const InputDecoration(
+                      labelText: 'Password',
+                      hintText: 'Enter your password',
+                      prefixIcon: Icon(Icons.lock),
+                    ),
+                    obscureText: true,
+                    textInputAction: TextInputAction.done,
+                    onFieldSubmitted: (_) => _handleLogin(),
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'Please enter your password';
+                      }
+                      if (value.length < 6) {
+                        return 'Password must be at least 6 characters';
                       }
                       return null;
                     },
@@ -138,25 +177,28 @@ class _LoginScreenState extends State<LoginScreen> {
 
                   // Info Text
                   Container(
-                    padding: const EdgeInsets.all(16),
+                    padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: Colors.blue[50],
-                      borderRadius: BorderRadius.circular(12),
+                      color: AppTheme.primaryColor.withOpacity(0.08),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: AppTheme.primaryColor.withOpacity(0.2),
+                      ),
                     ),
                     child: Row(
                       children: [
                         Icon(
                           Icons.info_outline,
-                          color: Colors.blue[700],
-                          size: 20,
+                          color: AppTheme.primaryColor,
+                          size: 18,
                         ),
-                        const SizedBox(width: 12),
+                        const SizedBox(width: 10),
                         Expanded(
                           child: Text(
                             'Your device will be registered automatically for secure attendance marking',
                             style: TextStyle(
                               fontSize: 12,
-                              color: Colors.blue[700],
+                              color: AppTheme.textPrimary.withOpacity(0.8),
                             ),
                           ),
                         ),

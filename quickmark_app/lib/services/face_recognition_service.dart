@@ -1,12 +1,13 @@
 import 'dart:math';
 import 'dart:typed_data';
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:camera/camera.dart';
 import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
 import 'package:image/image.dart' as img;
 import 'package:tflite_flutter/tflite_flutter.dart';
-import 'storage_service.dart';
+import 'database_service.dart';
 
 /// Result of face recognition
 class FaceRecognitionResult {
@@ -34,12 +35,12 @@ class FaceRecognitionService {
   Interpreter? _interpreter;
   bool _isInitialized = false;
   
-  final StorageService _storageService = StorageService();
+  final DatabaseService _dbService = DatabaseService();
   
   // Model configuration for MobileFaceNet
   static const int _inputSize = 112; // MobileFaceNet expects 112x112 images
   static const int _embeddingSize = 192; // Output embedding size
-  static const double _recognitionThreshold = 0.6; // Cosine similarity threshold
+  static const double _recognitionThreshold = 0.4; // Lowered for better usability
   
   /// Initialize the TFLite interpreter
   Future<bool> initialize() async {
@@ -61,13 +62,14 @@ class FaceRecognitionService {
   /// Check if model is available
   bool get isModelAvailable => _isInitialized && _interpreter != null;
   
-  /// Check if face is enrolled
-  Future<bool> isFaceEnrolled() async {
-    return await _storageService.hasFaceEnrolled();
+  /// Check if face is enrolled for student
+  Future<bool> isFaceEnrolled(String studentId) async {
+    final user = await _dbService.getUser(studentId);
+    return user?.isEnrolled ?? false;
   }
   
   /// Enroll a face
-  Future<FaceRecognitionResult> enrollFace(CameraImage image, Face face) async {
+  Future<FaceRecognitionResult> enrollFace(CameraImage image, Face face, String studentId) async {
     // Initialize if not already done
     if (!_isInitialized) {
       await initialize();
@@ -77,7 +79,7 @@ class FaceRecognitionService {
       // Fallback to landmark-based approach
       debugPrint('FaceRecognitionService: Using fallback mode (no TFLite model)');
       final embedding = _generateFallbackEmbedding(face);
-      await _storageService.saveFaceEmbedding(embedding);
+      await _dbService.updateFaceEmbedding(studentId, embedding);
       return FaceRecognitionResult(
         faceDetected: true,
         recognized: true,
@@ -93,7 +95,7 @@ class FaceRecognitionService {
       if (embedding == null) {
         debugPrint('FaceRecognitionService: Failed to generate embedding, using fallback');
         final fallbackEmbedding = _generateFallbackEmbedding(face);
-        await _storageService.saveFaceEmbedding(fallbackEmbedding);
+        await _dbService.updateFaceEmbedding(studentId, fallbackEmbedding);
         return FaceRecognitionResult(
           faceDetected: true,
           recognized: true,
@@ -103,7 +105,7 @@ class FaceRecognitionService {
         );
       }
       
-      await _storageService.saveFaceEmbedding(embedding);
+      await _dbService.updateFaceEmbedding(studentId, embedding);
       debugPrint('FaceRecognitionService: Face embedding saved successfully!');
       return FaceRecognitionResult(
         faceDetected: true,
@@ -124,14 +126,28 @@ class FaceRecognitionService {
   }
   
   /// Verify a face against enrolled embedding
-  Future<FaceRecognitionResult> verifyFace(CameraImage image, Face face) async {
-    final storedEmbedding = await _storageService.getFaceEmbedding();
-    if (storedEmbedding == null) {
+  Future<FaceRecognitionResult> verifyFace(CameraImage image, Face face, String studentId) async {
+    final user = await _dbService.getUser(studentId);
+    
+    if (user == null || user.faceEmbedding == null) {
       return FaceRecognitionResult(
         faceDetected: true,
         recognized: false,
         similarity: 0.0,
         message: 'No face enrolled. Please enroll first.',
+      );
+    }
+    
+    List<double> storedEmbedding;
+    try {
+      storedEmbedding = List<double>.from(jsonDecode(user.faceEmbedding!));
+    } catch (e) {
+      // Fallback for old format if any?
+      return FaceRecognitionResult(
+        faceDetected: true,
+        recognized: false,
+        similarity: 0.0,
+        message: 'Invalid enrollment data.',
       );
     }
     
@@ -398,8 +414,20 @@ class FaceRecognitionService {
   }
   
   /// Clear enrolled face
-  Future<bool> clearEnrolledFace() async {
-    return await _storageService.clearFaceEnrollment();
+  Future<bool> clearEnrolledFace(String studentId) async {
+    try {
+      final db = await _dbService.database;
+      await db.update(
+        'users',
+        {'face_embedding': null, 'is_enrolled': 0},
+        where: 'student_id = ?',
+        whereArgs: [studentId],
+      );
+      return true;
+    } catch (e) {
+      debugPrint('Error clearing face: $e');
+      return false;
+    }
   }
   
   /// Dispose resources
